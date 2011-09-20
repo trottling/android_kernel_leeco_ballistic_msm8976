@@ -153,7 +153,7 @@ static int sdcardfs_unlink(struct inode *dir, struct dentry *dentry)
 	dget(lower_dentry);
 	lower_dir_dentry = lock_parent(lower_dentry);
 
-	err = vfs_unlink2(lower_mnt, lower_dir_inode, lower_dentry);
+	err = vfs_unlink2(lower_mnt, lower_dir_inode, lower_dentry, NULL);
 
 	/*
 	 * Note: unlinking on top of NFS can cause silly-renamed files.
