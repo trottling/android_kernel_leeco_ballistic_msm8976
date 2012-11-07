@@ -312,6 +312,18 @@ static inline void disallow_signal(int sig)
 	p->sig > 0;						\
 })
 
+/*
+ * Eventually that'll replace get_signal_to_deliver(); macro for now,
+ * to avoid nastiness with include order.
+ */
+#define get_signal(ksig)					\
+({								\
+	struct ksignal *p = (ksig);				\
+	p->sig = get_signal_to_deliver(&p->info, &p->ka,	\
+					signal_pt_regs(), NULL);\
+	p->sig > 0;						\
+})
+
 extern struct kmem_cache *sighand_cachep;
 
 int unhandled_signal(struct task_struct *tsk, int sig);
