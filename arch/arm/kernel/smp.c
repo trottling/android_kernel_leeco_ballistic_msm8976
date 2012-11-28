@@ -67,6 +67,7 @@ enum ipi_msg_type {
 	IPI_CALL_FUNC,
 	IPI_CALL_FUNC_SINGLE,
 	IPI_CPU_STOP,
+	IPI_COMPLETION,
 	IPI_CPU_BACKTRACE,
 };
 
@@ -482,6 +483,7 @@ static const char *ipi_types[NR_IPI] = {
 	S(IPI_CALL_FUNC, "Function call interrupts"),
 	S(IPI_CALL_FUNC_SINGLE, "Single function call interrupts"),
 	S(IPI_CPU_STOP, "CPU stop interrupts"),
+	S(IPI_COMPLETION, "completion interrupts"),
 	S(IPI_CPU_BACKTRACE, "CPU backtrace"),
 };
 
@@ -612,6 +614,19 @@ static void ipi_cpu_stop(unsigned int cpu, struct pt_regs *regs)
 		cpu_relax();
 }
 
+static DEFINE_PER_CPU(struct completion *, cpu_completion);
+
+int register_ipi_completion(struct completion *completion, int cpu)
+{
+	per_cpu(cpu_completion, cpu) = completion;
+	return IPI_COMPLETION;
+}
+
+static void ipi_complete(unsigned int cpu)
+{
+	complete(per_cpu(cpu_completion, cpu));
+}
+
 static cpumask_t backtrace_mask;
 static DEFINE_RAW_SPINLOCK(backtrace_lock);
 
@@ -712,6 +727,12 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 	case IPI_CPU_STOP:
 		irq_enter();
 		ipi_cpu_stop(cpu, regs);
+		irq_exit();
+		break;
+
+	case IPI_COMPLETION:
+		irq_enter();
+		ipi_complete(cpu);
 		irq_exit();
 		break;
 
