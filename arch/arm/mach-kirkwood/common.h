@@ -53,6 +53,8 @@ void kirkwood_nand_init_rnb(struct mtd_partition *parts, int nr_parts,
 			    int (*dev_ready)(struct mtd_info *));
 void kirkwood_audio_init(void);
 void kirkwood_cpuidle_init(void);
+void kirkwood_cpufreq_init(void);
+
 void kirkwood_restart(enum reboot_mode, const char *);
 void kirkwood_clk_init(void);
 
