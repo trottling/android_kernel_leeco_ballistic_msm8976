@@ -106,11 +106,6 @@ extern struct pci_ops via82c505_ops;
 extern int via82c505_setup(int nr, struct pci_sys_data *);
 extern void via82c505_init(void *sysdata);
 
-extern struct pci_ops pci_v3_ops;
-extern int pci_v3_setup(int nr, struct pci_sys_data *);
-extern void pci_v3_preinit(void);
-extern void pci_v3_postinit(void);
-
 #ifdef CONFIG_MSM_PCIE
 #define arch_setup_msi_irqs arch_setup_msi_irqs
 #define arch_teardown_msi_irqs arch_teardown_msi_irqs
