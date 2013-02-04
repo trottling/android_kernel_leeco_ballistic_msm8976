@@ -21,6 +21,7 @@ obj-$(CONFIG_DEVFREQ_GOV_SPDM_HYP) 	+= governor_spdm_bw_hyp.o
 
 # DEVFREQ Drivers
 obj-$(CONFIG_ARM_EXYNOS4_BUS_DEVFREQ)	+= exynos/
+obj-$(CONFIG_ARM_EXYNOS5_BUS_DEVFREQ)	+= exynos/
 obj-$(CONFIG_MSM_DEVFREQ_DEVBW)		+= devfreq_devbw.o
 obj-$(CONFIG_DEVFREQ_SIMPLE_DEV)	+= devfreq_simple_dev.o
 obj-$(CONFIG_DEVFREQ_SPDM) 		+= devfreq_spdm.o devfreq_spdm_debugfs.o
