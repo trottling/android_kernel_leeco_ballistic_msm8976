@@ -88,6 +88,7 @@ synaptics	Synaptics Inc.
 synopsys 	Synopsys, Inc. (deprecated, use snps)
 ti	Texas Instruments
 toshiba	Toshiba Corporation
+v3	V3 Semiconductor
 via	VIA Technologies, Inc.
 wlf	Wolfson Microelectronics
 wm	Wondermedia Technologies, Inc.
