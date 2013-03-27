@@ -10,7 +10,7 @@
 extern void synchronize_irq(unsigned int irq);
 extern void synchronize_hardirq(unsigned int irq);
 
-#if defined(CONFIG_TINY_RCU) || defined(CONFIG_TINY_PREEMPT_RCU)
+#if defined(CONFIG_TINY_RCU)
 
 static inline void rcu_nmi_enter(void)
 {
