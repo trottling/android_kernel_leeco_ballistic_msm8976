@@ -38,7 +38,6 @@ static void __init kzm_init(void)
 	sh73a0_add_standard_devices_dt();
 
 	/* enable SD */
-	gpio_request(GPIO_FN_SDHI0_VCCQ_MC0_ON,	NULL);
 	gpio_request_one(15, GPIOF_OUT_INIT_HIGH, NULL); /* power */
 
 	gpio_request_one(14, GPIOF_OUT_INIT_HIGH, NULL); /* power */
