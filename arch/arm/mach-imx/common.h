@@ -76,6 +76,7 @@ extern struct platform_device *mxc_register_gpio(char *name, int id,
 extern void mxc_set_cpu_type(unsigned int type);
 extern void mxc_restart(enum reboot_mode, const char *);
 extern void mxc_arch_reset_init(void __iomem *);
+extern void mxc_arch_reset_init_dt(void);
 extern int mx53_revision(void);
 extern int imx6q_revision(void);
 extern int mx53_display_revision(void);
