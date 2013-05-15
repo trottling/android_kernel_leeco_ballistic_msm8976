@@ -8,4 +8,5 @@ generic-y += exec.h
 generic-y += mcs_spinlock.h
 generic-y += module.h
 generic-y += trace_clock.h
+generic-y += vga.h
 generic-y += xor.h
