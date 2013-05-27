@@ -25,7 +25,7 @@
 #include <linux/reboot.h>
 #include <linux/of.h>
 #include <linux/irqchip.h>
-#include <linux/clk/tegra.h>
+#include <linux/clk-provider.h>
 
 #include <asm/hardware/cache-l2x0.h>
 
@@ -62,7 +62,7 @@ u32 tegra_uart_config[4] = {
 #ifdef CONFIG_OF
 void __init tegra_dt_init_irq(void)
 {
-	tegra_clocks_init();
+	of_clk_init(NULL);
 	tegra_pmc_init();
 	tegra_init_irq();
 	irqchip_init();
