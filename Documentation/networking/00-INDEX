@@ -98,8 +98,6 @@ i40evf.txt
 	- Short note on the Driver for the Intel(R) XL710 X710 Virtual Function
 ieee802154.txt
 	- Linux IEEE 802.15.4 implementation, API and drivers
-ifenslave.c
-	- Configure network interfaces for parallel routing (bonding).
 igb.txt
 	- README for the Intel Gigabit Ethernet Driver (igb).
 igbvf.txt
