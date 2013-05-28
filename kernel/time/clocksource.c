@@ -646,6 +646,7 @@ static void clocksource_select_fallback(void)
 #else /* !CONFIG_ARCH_USES_GETTIMEOFFSET */
 
 static inline void clocksource_select(void) { }
+static inline void clocksource_select_fallback(void) { }
 
 #endif
 
