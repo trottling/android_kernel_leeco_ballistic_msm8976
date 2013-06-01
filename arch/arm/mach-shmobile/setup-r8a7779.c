@@ -455,7 +455,7 @@ static struct platform_device sata_device = {
 };
 
 /* USB PHY */
-static struct resource usb_phy_resources[] = {
+static struct resource usb_phy_resources[] __initdata = {
 	[0] = {
 		.start		= 0xffe70000,
 		.end		= 0xffe70900 - 1,
@@ -466,13 +466,6 @@ static struct resource usb_phy_resources[] = {
 		.end		= 0xfff70900 - 1,
 		.flags		= IORESOURCE_MEM,
 	},
-};
-
-static struct platform_device usb_phy_device = {
-	.name		= "rcar_usb_phy",
-	.id		= -1,
-	.resource	= usb_phy_resources,
-	.num_resources	= ARRAY_SIZE(usb_phy_resources),
 };
 
 /* USB */
@@ -631,7 +624,6 @@ static struct platform_device *r8a7779_devices_dt[] __initdata = {
 	&scif5_device,
 	&tmu00_device,
 	&tmu01_device,
-	&usb_phy_device,
 };
 
 static struct platform_device *r8a7779_standard_devices[] __initdata = {
@@ -663,6 +655,14 @@ void __init r8a7779_add_ether_device(struct sh_eth_plat_data *pdata)
 	platform_device_register_resndata(&platform_bus, "sh_eth", -1,
 					  ether_resources,
 					  ARRAY_SIZE(ether_resources),
+					  pdata, sizeof(*pdata));
+}
+
+void __init r8a7779_add_usb_phy_device(struct rcar_phy_platform_data *pdata)
+{
+	platform_device_register_resndata(&platform_bus, "rcar_usb_phy", -1,
+					  usb_phy_resources,
+					  ARRAY_SIZE(usb_phy_resources),
 					  pdata, sizeof(*pdata));
 }
 
