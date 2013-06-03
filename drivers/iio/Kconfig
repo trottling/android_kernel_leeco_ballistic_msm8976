@@ -72,5 +72,6 @@ source "drivers/iio/magnetometer/Kconfig"
 if IIO_TRIGGER
    source "drivers/iio/trigger/Kconfig"
 endif #IIO_TRIGGER
+source "drivers/iio/pressure/Kconfig"
 
 endif # IIO
