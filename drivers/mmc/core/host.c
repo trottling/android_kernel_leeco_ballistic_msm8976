@@ -264,16 +264,9 @@ out:
 }
 #endif
 
-static const struct dev_pm_ops mmc_host_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(mmc_host_suspend, mmc_host_resume)
-	SET_RUNTIME_PM_OPS(mmc_host_runtime_suspend, mmc_host_runtime_resume,
-			   pm_generic_runtime_idle)
-};
-
 static struct class mmc_host_class = {
 	.name		= "mmc_host",
 	.dev_release	= mmc_host_classdev_release,
-	.pm		= &mmc_host_pm_ops,
 };
 
 int mmc_register_host_class(void)
