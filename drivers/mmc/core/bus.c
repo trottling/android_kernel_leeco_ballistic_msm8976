@@ -198,22 +198,7 @@ static int mmc_runtime_resume(struct device *dev)
 
 static int mmc_runtime_idle(struct device *dev)
 {
-	struct mmc_card *card = mmc_dev_to_card(dev);
-	struct mmc_host *host = card->host;
-	int ret = 0;
-
-	if (mmc_use_core_runtime_pm(card->host)) {
-		ret = pm_schedule_suspend(dev, card->idle_timeout);
-		if ((ret < 0) && (dev->power.runtime_error ||
-				  dev->power.disable_depth > 0)) {
-			pr_err("%s: %s: %s: pm_schedule_suspend failed: err: %d\n",
-			       mmc_hostname(host), __func__, dev_name(dev),
-			       ret);
-			return ret;
-		}
-	}
-
-	return ret;
+	return 0;
 }
 
 #endif /* !CONFIG_PM_RUNTIME */
