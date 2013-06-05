@@ -418,7 +418,6 @@ static int exynos5_busfreq_int_probe(struct platform_device *pdev)
 
 err_devfreq_add:
 	devfreq_remove_device(data->devfreq);
-	platform_set_drvdata(pdev, NULL);
 err_opp_add:
 	clk_put(data->int_clk);
 err_clock:
@@ -436,7 +435,6 @@ static int exynos5_busfreq_int_remove(struct platform_device *pdev)
 	devfreq_remove_device(data->devfreq);
 	regulator_put(data->vdd_int);
 	clk_put(data->int_clk);
-	platform_set_drvdata(pdev, NULL);
 
 	return 0;
 }
