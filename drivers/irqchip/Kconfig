@@ -40,6 +40,11 @@ config MSM_SHOW_RESUME_IRQ
 	  wake up interrupts that causes system to come out of low power modes.
 	  Say Y if you want to debug why the system resumed.
 
+config ORION_IRQCHIP
+	bool
+	select IRQ_DOMAIN
+	select MULTI_IRQ_HANDLER
+
 config RENESAS_INTC_IRQPIN
 	bool
 	select IRQ_DOMAIN
