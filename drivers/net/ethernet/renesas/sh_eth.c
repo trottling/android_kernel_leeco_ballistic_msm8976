@@ -673,6 +673,7 @@ static struct sh_eth_cpu_data r8a7740_data = {
 	.tsu		= 1,
 	.select_mii	= 1,
 };
+#endif
 
 static struct sh_eth_cpu_data sh7619_data = {
 	.eesipr_value	= DMAC_M_RFRMER | DMAC_M_ECI | 0x003fffff,
