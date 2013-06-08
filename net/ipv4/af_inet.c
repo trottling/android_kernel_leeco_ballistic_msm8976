@@ -1574,13 +1574,6 @@ static const struct net_protocol udp_protocol = {
 	.netns_ok =	1,
 };
 
-static const struct net_offload udp_offload = {
-	.callbacks = {
-		.gso_send_check = udp4_ufo_send_check,
-		.gso_segment = udp4_ufo_fragment,
-	},
-};
-
 static const struct net_protocol icmp_protocol = {
 	.handler =	icmp_rcv,
 	.err_handler =	icmp_err,
@@ -1693,7 +1686,7 @@ static int __init ipv4_offload_init(void)
 	/*
 	 * Add offloads
 	 */
-	if (inet_add_offload(&udp_offload, IPPROTO_UDP) < 0)
+	if (udpv4_offload_init() < 0)
 		pr_crit("%s: Cannot add UDP protocol offload\n", __func__);
 	if (tcpv4_offload_init() < 0)
 		pr_crit("%s: Cannot add TCP protocol offload\n", __func__);
