@@ -856,6 +856,7 @@ config ARCH_EXYNOS
 	select NEED_MACH_MEMORY_H
 	select S5P_GPIO_DRVSTR
 	select SAMSUNG_ATAGS
+	select SPARSE_IRQ
 	select USE_OF
 	help
 	  Support for SAMSUNG's EXYNOS SoCs (EXYNOS4/5)
