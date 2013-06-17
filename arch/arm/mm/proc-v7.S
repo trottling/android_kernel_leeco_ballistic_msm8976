@@ -171,8 +171,6 @@ ENDPROC(cpu_pj4b_do_idle)
 
 #endif
 
-	__CPUINIT
-
 /*
  *	__v7_setup
  *
