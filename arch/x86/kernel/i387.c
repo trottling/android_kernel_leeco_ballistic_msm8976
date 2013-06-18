@@ -117,9 +117,9 @@ EXPORT_SYMBOL(unlazy_fpu);
 unsigned int mxcsr_feature_mask __read_mostly = 0xffffffffu;
 unsigned int xstate_size;
 EXPORT_SYMBOL_GPL(xstate_size);
-static struct i387_fxsave_struct fx_scratch __cpuinitdata;
+static struct i387_fxsave_struct fx_scratch;
 
-static void __cpuinit mxcsr_feature_mask_init(void)
+static void mxcsr_feature_mask_init(void)
 {
 	unsigned long mask = 0;
 
@@ -133,7 +133,7 @@ static void __cpuinit mxcsr_feature_mask_init(void)
 	mxcsr_feature_mask &= mask;
 }
 
-static void __cpuinit init_thread_xstate(void)
+static void init_thread_xstate(void)
 {
 	/*
 	 * Note that xstate_size might be overwriten later during
@@ -162,7 +162,7 @@ static void __cpuinit init_thread_xstate(void)
  * into all processes.
  */
 
-void __cpuinit fpu_init(void)
+void fpu_init(void)
 {
 	unsigned long cr0;
 	unsigned long cr4_mask = 0;
@@ -617,7 +617,7 @@ static int __init no_387(char *s)
 
 __setup("no387", no_387);
 
-void __cpuinit fpu_detect(struct cpuinfo_x86 *c)
+void fpu_detect(struct cpuinfo_x86 *c)
 {
 	unsigned long cr0;
 	u16 fsw, fcw;
