@@ -21,8 +21,6 @@ extern unsigned long xxti_f, xusbxti_f;
 
 struct map_desc;
 void exynos_init_io(struct map_desc *mach_desc, int size);
-void exynos4_init_irq(void);
-void exynos5_init_irq(void);
 void exynos4_restart(enum reboot_mode mode, const char *cmd);
 void exynos5_restart(enum reboot_mode mode, const char *cmd);
 void exynos_init_late(void);
