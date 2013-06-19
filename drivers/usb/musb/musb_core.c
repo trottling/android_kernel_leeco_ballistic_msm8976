@@ -1932,6 +1932,8 @@ fail4:
 	musb_gadget_cleanup(musb);
 
 fail3:
+	if (musb->dma_controller)
+		dma_controller_destroy(musb->dma_controller);
 	pm_runtime_put_sync(musb->controller);
 
 fail2:
