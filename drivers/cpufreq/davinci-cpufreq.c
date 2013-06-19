@@ -102,6 +102,9 @@ static int davinci_target(struct cpufreq_policy *policy, unsigned int idx)
 		pdata->set_voltage(idx);
 
 out:
+	if (ret)
+		freqs.new = freqs.old;
+
 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
 
 	return ret;
