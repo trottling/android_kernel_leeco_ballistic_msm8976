@@ -469,5 +469,4 @@ unaligned:
 	printk("%s: unaligned epc - sending SIGBUS.\n", current->comm);
 	force_sig(SIGBUS, current);
 	return -EFAULT;
-
 }
