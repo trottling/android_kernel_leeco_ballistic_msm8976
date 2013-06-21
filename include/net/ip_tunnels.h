@@ -116,6 +116,8 @@ struct ip_tunnel_net {
 	struct hlist_head tunnels[IP_TNL_HASH_SIZE];
 };
 
+#ifdef CONFIG_INET
+
 int ip_tunnel_init(struct net_device *dev);
 void ip_tunnel_uninit(struct net_device *dev);
 void  ip_tunnel_dellink(struct net_device *dev, struct list_head *head);
@@ -196,4 +198,7 @@ static inline void iptunnel_xmit_stats(int err,
 		err_stats->tx_dropped++;
 	}
 }
+
+#endif /* CONFIG_INET */
+
 #endif /* __NET_IP_TUNNELS_H */
