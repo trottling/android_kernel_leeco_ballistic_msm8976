@@ -2142,13 +2142,12 @@ void locks_remove_flock(struct file *filp)
 
 /**
  *	posix_unblock_lock - stop waiting for a file lock
- *      @filp:   how the file was opened
  *	@waiter: the lock which was waiting
  *
  *	lockd needs to block waiting for locks.
  */
 int
-posix_unblock_lock(struct file *filp, struct file_lock *waiter)
+posix_unblock_lock(struct file_lock *waiter)
 {
 	int status = 0;
 
@@ -2160,7 +2159,6 @@ posix_unblock_lock(struct file *filp, struct file_lock *waiter)
 	unlock_flocks();
 	return status;
 }
-
 EXPORT_SYMBOL(posix_unblock_lock);
 
 /**
