@@ -551,10 +551,8 @@ static int zerocopy_sg_from_iovec(struct sk_buff *skb, const struct iovec *from,
 			return -EMSGSIZE;
 		num_pages = get_user_pages_fast(base, size, 0, &page[i]);
 		if (num_pages != size) {
-			int j;
-
-			for (j = 0; j < num_pages; j++)
-				put_page(page[i + j]);
+			for (i = 0; i < num_pages; i++)
+				put_page(page[i]);
 			return -EFAULT;
 		}
 		truesize = size * PAGE_SIZE;
@@ -652,8 +650,6 @@ static int macvtap_skb_to_vnet_hdr(const struct sk_buff *skb,
 	if (skb->ip_summed == CHECKSUM_PARTIAL) {
 		vnet_hdr->flags = VIRTIO_NET_HDR_F_NEEDS_CSUM;
 		vnet_hdr->csum_start = skb_checksum_start_offset(skb);
-		if (vlan_tx_tag_present(skb))
-			vnet_hdr->csum_start += VLAN_HLEN;
 		vnet_hdr->csum_offset = skb->csum_offset;
 	} else if (skb->ip_summed == CHECKSUM_UNNECESSARY) {
 		vnet_hdr->flags = VIRTIO_NET_HDR_F_DATA_VALID;
@@ -662,38 +658,12 @@ static int macvtap_skb_to_vnet_hdr(const struct sk_buff *skb,
 	return 0;
 }
 
-static unsigned long iov_pages(const struct iovec *iv, int offset,
-			       unsigned long nr_segs)
-{
-	unsigned long seg, base;
-	int pages = 0, len, size;
-
-	while (nr_segs && (offset >= iv->iov_len)) {
-		offset -= iv->iov_len;
-		++iv;
-		--nr_segs;
-	}
-
-	for (seg = 0; seg < nr_segs; seg++) {
-		base = (unsigned long)iv[seg].iov_base + offset;
-		len = iv[seg].iov_len - offset;
-		size = ((base & ~PAGE_MASK) + len + ~PAGE_MASK) >> PAGE_SHIFT;
-		pages += size;
-		offset = 0;
-	}
-
-	return pages;
-}
-
-/* Neighbour code has some assumptions on HH_DATA_MOD alignment */
-#define MACVTAP_RESERVE HH_DATA_OFF(ETH_HLEN)
 
 /* Get packet from user space buffer */
 static ssize_t macvtap_get_user(struct macvtap_queue *q, struct msghdr *m,
 				const struct iovec *iv, unsigned long total_len,
 				size_t count, int noblock)
 {
-	int good_linear = SKB_MAX_HEAD(MACVTAP_RESERVE);
 	struct sk_buff *skb;
 	struct macvlan_dev *vlan;
 	unsigned long len = total_len;
@@ -702,10 +672,9 @@ static ssize_t macvtap_get_user(struct macvtap_queue *q, struct msghdr *m,
 	int vnet_hdr_len = 0;
 	int copylen = 0;
 	bool zerocopy = false;
-	size_t linear;
 
 	if (q->flags & IFF_VNET_HDR) {
-		vnet_hdr_len = ACCESS_ONCE(q->vnet_hdr_sz);
+		vnet_hdr_len = q->vnet_hdr_sz;
 
 		err = -EINVAL;
 		if (len < vnet_hdr_len)
@@ -734,40 +703,42 @@ static ssize_t macvtap_get_user(struct macvtap_queue *q, struct msghdr *m,
 	if (unlikely(count > UIO_MAXIOV))
 		goto err;
 
-	if (m && m->msg_control && sock_flag(&q->sk, SOCK_ZEROCOPY)) {
-		copylen = vnet_hdr.hdr_len ? vnet_hdr.hdr_len : GOODCOPY_LEN;
-		if (copylen > good_linear)
-			copylen = good_linear;
-		linear = copylen;
-		if (iov_pages(iv, vnet_hdr_len + copylen, count)
-		    <= MAX_SKB_FRAGS)
-			zerocopy = true;
-	}
+	if (m && m->msg_control && sock_flag(&q->sk, SOCK_ZEROCOPY))
+		zerocopy = true;
 
-	if (!zerocopy) {
+	if (zerocopy) {
+		/* Userspace may produce vectors with count greater than
+		 * MAX_SKB_FRAGS, so we need to linearize parts of the skb
+		 * to let the rest of data to be fit in the frags.
+		 */
+		if (count > MAX_SKB_FRAGS) {
+			copylen = iov_length(iv, count - MAX_SKB_FRAGS);
+			if (copylen < vnet_hdr_len)
+				copylen = 0;
+			else
+				copylen -= vnet_hdr_len;
+		}
+		/* There are 256 bytes to be copied in skb, so there is enough
+		 * room for skb expand head in case it is used.
+		 * The rest buffer is mapped from userspace.
+		 */
+		if (copylen < vnet_hdr.hdr_len)
+			copylen = vnet_hdr.hdr_len;
+		if (!copylen)
+			copylen = GOODCOPY_LEN;
+	} else
 		copylen = len;
-		if (vnet_hdr.hdr_len > good_linear)
-			linear = good_linear;
-		else
-			linear = vnet_hdr.hdr_len;
-	}
 
-	skb = macvtap_alloc_skb(&q->sk, MACVTAP_RESERVE, copylen,
-				linear, noblock, &err);
+	skb = macvtap_alloc_skb(&q->sk, NET_IP_ALIGN, copylen,
+				vnet_hdr.hdr_len, noblock, &err);
 	if (!skb)
 		goto err;
 
 	if (zerocopy)
 		err = zerocopy_sg_from_iovec(skb, iv, vnet_hdr_len, count);
-	else {
+	else
 		err = skb_copy_datagram_from_iovec(skb, 0, iv, vnet_hdr_len,
 						   len);
-		if (!err && m && m->msg_control) {
-			struct ubuf_info *uarg = m->msg_control;
-			uarg->callback(uarg, false);
-		}
-	}
-
 	if (err)
 		goto err_kfree;
 
@@ -783,8 +754,8 @@ static ssize_t macvtap_get_user(struct macvtap_queue *q, struct msghdr *m,
 
 	skb_probe_transport_header(skb, ETH_HLEN);
 
-	rcu_read_lock_bh();
-	vlan = rcu_dereference_bh(q->vlan);
+	rcu_read_lock();
+	vlan = rcu_dereference(q->vlan);
 	/* copy skb_ubuf_info for callback when skb has no error */
 	if (zerocopy) {
 		skb_shinfo(skb)->destructor_arg = m->msg_control;
@@ -795,7 +766,7 @@ static ssize_t macvtap_get_user(struct macvtap_queue *q, struct msghdr *m,
 		macvlan_start_xmit(skb, vlan->dev);
 	else
 		kfree_skb(skb);
-	rcu_read_unlock_bh();
+	rcu_read_unlock();
 
 	return total_len;
 
@@ -803,11 +774,11 @@ err_kfree:
 	kfree_skb(skb);
 
 err:
-	rcu_read_lock_bh();
-	vlan = rcu_dereference_bh(q->vlan);
+	rcu_read_lock();
+	vlan = rcu_dereference(q->vlan);
 	if (vlan)
 		vlan->dev->stats.tx_dropped++;
-	rcu_read_unlock_bh();
+	rcu_read_unlock();
 
 	return err;
 }
@@ -829,6 +800,7 @@ static ssize_t macvtap_put_user(struct macvtap_queue *q,
 				const struct sk_buff *skb,
 				const struct iovec *iv, int len)
 {
+	struct macvlan_dev *vlan;
 	int ret;
 	int vnet_hdr_len = 0;
 	int vlan_offset = 0;
@@ -836,7 +808,7 @@ static ssize_t macvtap_put_user(struct macvtap_queue *q,
 
 	if (q->flags & IFF_VNET_HDR) {
 		struct virtio_net_hdr vnet_hdr;
-		vnet_hdr_len = ACCESS_ONCE(q->vnet_hdr_sz);
+		vnet_hdr_len = q->vnet_hdr_sz;
 		if ((len -= vnet_hdr_len) < 0)
 			return -EINVAL;
 
@@ -882,6 +854,12 @@ static ssize_t macvtap_put_user(struct macvtap_queue *q,
 	copied += len;
 
 done:
+	rcu_read_lock();
+	vlan = rcu_dereference(q->vlan);
+	if (vlan)
+		macvlan_count_rx(vlan, copied - vnet_hdr_len, ret == 0, 0);
+	rcu_read_unlock();
+
 	return ret ? ret : copied;
 }
 
@@ -938,8 +916,6 @@ static ssize_t macvtap_aio_read(struct kiocb *iocb, const struct iovec *iv,
 
 	ret = macvtap_do_read(q, iocb, iv, len, file->f_flags & O_NONBLOCK);
 	ret = min_t(ssize_t, ret, len); /* XXX copied from tun.c. Why? */
-	if (ret > 0)
-		iocb->ki_pos = ret;
 out:
 	return ret;
 }
