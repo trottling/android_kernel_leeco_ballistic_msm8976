@@ -353,7 +353,7 @@ struct snd_soc_jack_gpio;
 
 typedef int (*hw_write_t)(void *,const char* ,int);
 
-extern struct snd_ac97_bus_ops soc_ac97_ops;
+extern struct snd_ac97_bus_ops *soc_ac97_ops;
 
 enum snd_soc_control_type {
 	SND_SOC_I2C = 1,
@@ -484,6 +484,8 @@ void snd_soc_free_ac97_codec(struct snd_soc_codec *codec);
 
 void snd_soc_card_change_online_state(struct snd_soc_card *soc_card,
 				      int online);
+
+int snd_soc_set_ac97_ops(struct snd_ac97_bus_ops *ops);
 
 /*
  *Controls
