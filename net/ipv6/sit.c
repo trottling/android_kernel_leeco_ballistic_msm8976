@@ -466,14 +466,14 @@ isatap_chksrc(struct sk_buff *skb, const struct iphdr *iph, struct ip_tunnel *t)
 
 static void ipip6_tunnel_uninit(struct net_device *dev)
 {
-	struct net *net = dev_net(dev);
-	struct sit_net *sitn = net_generic(net, sit_net_id);
+	struct ip_tunnel *tunnel = netdev_priv(dev);
+	struct sit_net *sitn = net_generic(tunnel->net, sit_net_id);
 
 	if (dev == sitn->fb_tunnel_dev) {
 		RCU_INIT_POINTER(sitn->tunnels_wc[0], NULL);
 	} else {
-		ipip6_tunnel_unlink(sitn, netdev_priv(dev));
-		ipip6_tunnel_del_prl(netdev_priv(dev), NULL);
+		ipip6_tunnel_unlink(sitn, tunnel);
+		ipip6_tunnel_del_prl(tunnel, NULL);
 	}
 	dev_put(dev);
 }
@@ -677,6 +677,8 @@ static int ipip6_rcv(struct sk_buff *skb)
 		tstats->rx_bytes += skb->len;
 		u64_stats_update_end(&tstats->syncp);
 
+		if (tunnel->net != dev_net(tunnel->dev))
+			skb_scrub_packet(skb);
 		netif_rx(skb);
 
 		return 0;
@@ -859,7 +861,7 @@ static netdev_tx_t ipip6_tunnel_xmit(struct sk_buff *skb,
 			goto tx_error;
 	}
 
-	rt = ip_route_output_ports(dev_net(dev), &fl4, NULL,
+	rt = ip_route_output_ports(tunnel->net, &fl4, NULL,
 				   dst, tiph->saddr,
 				   0, 0,
 				   IPPROTO_IPV6, RT_TOS(tos),
@@ -913,6 +915,9 @@ static netdev_tx_t ipip6_tunnel_xmit(struct sk_buff *skb,
 		} else
 			tunnel->err_count = 0;
 	}
+
+	if (tunnel->net != dev_net(dev))
+		skb_scrub_packet(skb);
 
 	/*
 	 * Okay, now see if we can stuff it in the buffer as-is.
@@ -1000,7 +1005,8 @@ static void ipip6_tunnel_bind_dev(struct net_device *dev)
 	iph = &tunnel->parms.iph;
 
 	if (iph->daddr) {
-		struct rtable *rt = ip_route_output_ports(dev_net(dev), &fl4, NULL,
+		struct rtable *rt = ip_route_output_ports(tunnel->net, &fl4,
+							  NULL,
 							  iph->daddr, iph->saddr,
 							  0, 0,
 							  IPPROTO_IPV6,
@@ -1015,7 +1021,7 @@ static void ipip6_tunnel_bind_dev(struct net_device *dev)
 	}
 
 	if (!tdev && tunnel->parms.link)
-		tdev = __dev_get_by_index(dev_net(dev), tunnel->parms.link);
+		tdev = __dev_get_by_index(tunnel->net, tunnel->parms.link);
 
 	if (tdev) {
 		dev->hard_header_len = tdev->hard_header_len + sizeof(struct iphdr);
@@ -1028,7 +1034,7 @@ static void ipip6_tunnel_bind_dev(struct net_device *dev)
 
 static void ipip6_tunnel_update(struct ip_tunnel *t, struct ip_tunnel_parm *p)
 {
-	struct net *net = dev_net(t->dev);
+	struct net *net = t->net;
 	struct sit_net *sitn = net_generic(net, sit_net_id);
 
 	ipip6_tunnel_unlink(sitn, t);
@@ -1304,7 +1310,6 @@ static void ipip6_tunnel_setup(struct net_device *dev)
 	dev->priv_flags	       &= ~IFF_XMIT_DST_RELEASE;
 	dev->iflink		= 0;
 	dev->addr_len		= 4;
-	dev->features		|= NETIF_F_NETNS_LOCAL;
 	dev->features		|= NETIF_F_LLTX;
 }
 
@@ -1314,6 +1319,7 @@ static int ipip6_tunnel_init(struct net_device *dev)
 	int i;
 
 	tunnel->dev = dev;
+	tunnel->net = dev_net(dev);
 
 	memcpy(dev->dev_addr, &tunnel->parms.iph.saddr, 4);
 	memcpy(dev->broadcast, &tunnel->parms.iph.daddr, 4);
@@ -1341,6 +1347,7 @@ static int __net_init ipip6_fb_tunnel_init(struct net_device *dev)
 	int i;
 
 	tunnel->dev = dev;
+	tunnel->net = dev_net(dev);
 	strcpy(tunnel->parms.name, dev->name);
 
 	iph->version		= 4;
@@ -1645,7 +1652,13 @@ static struct xfrm_tunnel ipip_handler __read_mostly = {
 
 static void __net_exit sit_destroy_tunnels(struct sit_net *sitn, struct list_head *head)
 {
+	struct net *net = dev_net(sitn->fb_tunnel_dev);
+	struct net_device *dev, *aux;
 	int prio;
+
+	for_each_netdev_safe(net, dev, aux)
+		if (dev->rtnl_link_ops == &sit_link_ops)
+			unregister_netdevice_queue(dev, head);
 
 	for (prio = 1; prio < 4; prio++) {
 		int h;
@@ -1654,7 +1667,12 @@ static void __net_exit sit_destroy_tunnels(struct sit_net *sitn, struct list_hea
 
 			t = rtnl_dereference(sitn->tunnels[prio][h]);
 			while (t != NULL) {
-				unregister_netdevice_queue(t->dev, head);
+				/* If dev is in the same netns, it has already
+				 * been added to the list by the previous loop.
+				 */
+				if (dev_net(t->dev) != net)
+					unregister_netdevice_queue(t->dev,
+								   head);
 				t = rtnl_dereference(t->next);
 			}
 		}
@@ -1679,6 +1697,10 @@ static int __net_init sit_init_net(struct net *net)
 		goto err_alloc_dev;
 	}
 	dev_net_set(sitn->fb_tunnel_dev, net);
+	/* FB netdevice is special: we have one, and only one per netns.
+	 * Allowing to move it to another netns is clearly unsafe.
+	 */
+	sitn->fb_tunnel_dev->features |= NETIF_F_NETNS_LOCAL;
 
 	err = ipip6_fb_tunnel_init(sitn->fb_tunnel_dev);
 	if (err)
