@@ -598,7 +598,7 @@ void ip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev,
 	}
 
 	rt = ip_route_output_tunnel(tunnel->net, &fl4,
-				    tunnel->parms.iph.protocol,
+				    protocol,
 				    dst, tnl_params->saddr,
 				    tunnel->parms.o_key,
 				    RT_TOS(tos),
