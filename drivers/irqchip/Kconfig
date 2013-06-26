@@ -15,6 +15,11 @@ config GIC_SECURE
 	bool
 	depends on ARM_GIC
 
+config ARM_NVIC
+	bool
+	select IRQ_DOMAIN
+	select GENERIC_IRQ_CHIP
+
 config ARM_VIC
 	bool
 	select IRQ_DOMAIN
