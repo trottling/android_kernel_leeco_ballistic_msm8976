@@ -1669,6 +1669,19 @@ static int i915_dpio_info(struct seq_file *m, void *data)
 	return 0;
 }
 
+static int i915_llc(struct seq_file *m, void *data)
+{
+	struct drm_info_node *node = (struct drm_info_node *) m->private;
+	struct drm_device *dev = node->minor->dev;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	/* Size calculation for LLC is a bit of a pain. Ignore for now. */
+	seq_printf(m, "LLC: %s\n", yesno(HAS_LLC(dev)));
+	seq_printf(m, "eLLC: %zuMB\n", dev_priv->ellc_size);
+
+	return 0;
+}
+
 static int
 i915_wedged_get(void *data, u64 *val)
 {
@@ -2074,6 +2087,7 @@ static struct drm_info_list i915_debugfs_list[] = {
 	{"i915_swizzle_info", i915_swizzle_info, 0},
 	{"i915_ppgtt_info", i915_ppgtt_info, 0},
 	{"i915_dpio", i915_dpio_info, 0},
+	{"i915_llc", i915_llc, 0},
 };
 #define I915_DEBUGFS_ENTRIES ARRAY_SIZE(i915_debugfs_list)
 
