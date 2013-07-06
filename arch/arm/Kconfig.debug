@@ -323,6 +323,7 @@ choice
 	config DEBUG_MMP_UART2
 		bool "Kernel low-level debugging message via MMP UART2"
 		depends on ARCH_MMP
+		select DEBUG_UART_8250
 		help
 		  Say Y here if you want kernel low-level debugging support
 		  on MMP UART2.
@@ -330,6 +331,7 @@ choice
 	config DEBUG_MMP_UART3
 		bool "Kernel low-level debugging message via MMP UART3"
 		depends on ARCH_MMP
+		select DEBUG_UART_8250
 		help
 		  Say Y here if you want kernel low-level debugging support
 		  on MMP UART3.
@@ -337,6 +339,7 @@ choice
 	config DEBUG_MVEBU_UART
 		bool "Kernel low-level debugging messages via MVEBU UART (old bootloaders)"
 		depends on ARCH_MVEBU
+		select DEBUG_UART_8250
 		help
 		  Say Y here if you want kernel low-level debugging support
 		  on MVEBU based platforms.
@@ -355,6 +358,7 @@ choice
 	config DEBUG_MVEBU_UART_ALTERNATE
 		bool "Kernel low-level debugging messages via MVEBU UART (new bootloaders)"
 		depends on ARCH_MVEBU
+		select DEBUG_UART_8250
 		help
 		  Say Y here if you want kernel low-level debugging support
 		  on MVEBU based platforms.
@@ -376,6 +380,7 @@ choice
 	config DEBUG_NSPIRE_CLASSIC_UART
 		bool "Kernel low-level debugging via TI-NSPIRE 8250 UART"
 		depends on ARCH_NSPIRE
+		select DEBUG_UART_8250
 		help
 		  Say Y here if you want kernel low-level debugging support
 		  on TI-NSPIRE classic models.
@@ -464,6 +469,7 @@ choice
 	config DEBUG_PXA_UART1
 		depends on ARCH_PXA
 		bool "Use PXA UART1 for low-level debug"
+		select DEBUG_UART_8250
 		help
 		  Say Y here if you want kernel low-level debugging support
 		  on PXA UART1.
@@ -488,6 +494,7 @@ choice
 		bool "Kernel low-level debugging messages via Rockchip RK29 UART0"
 		depends on ARCH_ROCKCHIP
 		select DEBUG_ROCKCHIP_UART
+		select DEBUG_UART_8250
 		help
 		  Say Y here if you want kernel low-level debugging support
 		  on Rockchip based platforms.
@@ -496,6 +503,7 @@ choice
 		bool "Kernel low-level debugging messages via Rockchip RK29 UART1"
 		depends on ARCH_ROCKCHIP
 		select DEBUG_ROCKCHIP_UART
+		select DEBUG_UART_8250
 		help
 		  Say Y here if you want kernel low-level debugging support
 		  on Rockchip based platforms.
@@ -504,6 +512,7 @@ choice
 		bool "Kernel low-level debugging messages via Rockchip RK29 UART2"
 		depends on ARCH_ROCKCHIP
 		select DEBUG_ROCKCHIP_UART
+		select DEBUG_UART_8250
 		help
 		  Say Y here if you want kernel low-level debugging support
 		  on Rockchip based platforms.
@@ -512,6 +521,7 @@ choice
 		bool "Kernel low-level debugging messages via Rockchip RK3X UART0"
 		depends on ARCH_ROCKCHIP
 		select DEBUG_ROCKCHIP_UART
+		select DEBUG_UART_8250
 		help
 		  Say Y here if you want kernel low-level debugging support
 		  on Rockchip based platforms.
@@ -520,6 +530,7 @@ choice
 		bool "Kernel low-level debugging messages via Rockchip RK3X UART1"
 		depends on ARCH_ROCKCHIP
 		select DEBUG_ROCKCHIP_UART
+		select DEBUG_UART_8250
 		help
 		  Say Y here if you want kernel low-level debugging support
 		  on Rockchip based platforms.
@@ -528,6 +539,7 @@ choice
 		bool "Kernel low-level debugging messages via Rockchip RK3X UART2"
 		depends on ARCH_ROCKCHIP
 		select DEBUG_ROCKCHIP_UART
+		select DEBUG_UART_8250
 		help
 		  Say Y here if you want kernel low-level debugging support
 		  on Rockchip based platforms.
@@ -536,6 +548,7 @@ choice
 		bool "Kernel low-level debugging messages via Rockchip RK3X UART3"
 		depends on ARCH_ROCKCHIP
 		select DEBUG_ROCKCHIP_UART
+		select DEBUG_UART_8250
 		help
 		  Say Y here if you want kernel low-level debugging support
 		  on Rockchip based platforms.
@@ -598,6 +611,7 @@ choice
 	config DEBUG_SUNXI_UART0
 		bool "Kernel low-level debugging messages via sunXi UART0"
 		depends on ARCH_SUNXI
+		select DEBUG_UART_8250
 		help
 		  Say Y here if you want kernel low-level debugging support
 		  on Allwinner A1X based platforms on the UART0.
@@ -605,6 +619,7 @@ choice
 	config DEBUG_SUNXI_UART1
 		bool "Kernel low-level debugging messages via sunXi UART1"
 		depends on ARCH_SUNXI
+		select DEBUG_UART_8250
 		help
 		  Say Y here if you want kernel low-level debugging support
 		  on Allwinner A1X based platforms on the UART1.
@@ -868,8 +883,17 @@ config DEBUG_LL_INCLUDE
 	default "mach/debug-macro.S"
 
 config DEBUG_UART_8250
-	def_bool ARCH_EBSA110 || (FOOTBRIDGE && !DEBUG_DC21285_PORT) || \
-		ARCH_GEMINI || ARCH_RPC
+	def_bool ARCH_DOVE || ARCH_EBSA110 || \
+		(FOOTBRIDGE && !DEBUG_DC21285_PORT) || \
+		ARCH_GEMINI || ARCH_IOP13XX || ARCH_IOP32X || \
+		ARCH_IOP33X || ARCH_IXP4XX || ARCH_KIRKWOOD || \
+		ARCH_LPC32XX || ARCH_MV78XX0 || ARCH_ORION5X || ARCH_RPC
+
+config DEBUG_UART_8250_SHIFT
+	int "Register offset shift for the 8250 debug UART"
+	depends on DEBUG_UART_8250
+	default 0 if FOOTBRIDGE || ARCH_IOP32X
+	default 2
 
 config DEBUG_UART_8250_FLOW_CONTROL
 	bool "Enable flow control for 8250 UART"
