@@ -1524,7 +1524,7 @@ process:
 	th = (const struct tcphdr *)skb->data;
 	hdr = ipv6_hdr(skb);
 
-	sk_mark_ll(sk, skb);
+	sk_mark_napi_id(sk, skb);
 	skb->dev = NULL;
 
 	bh_lock_sock_nested(sk);
