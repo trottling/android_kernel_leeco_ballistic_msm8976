@@ -100,8 +100,6 @@ void radeon_driver_irq_preinstall_kms(struct drm_device *dev);
 int radeon_driver_irq_postinstall_kms(struct drm_device *dev);
 void radeon_driver_irq_uninstall_kms(struct drm_device *dev);
 irqreturn_t radeon_driver_irq_handler_kms(DRM_IRQ_ARGS);
-int radeon_dma_ioctl_kms(struct drm_device *dev, void *data,
-			 struct drm_file *file_priv);
 int radeon_gem_object_init(struct drm_gem_object *obj);
 void radeon_gem_object_free(struct drm_gem_object *obj);
 int radeon_gem_object_open(struct drm_gem_object *obj,
@@ -408,7 +406,6 @@ static struct drm_driver kms_driver = {
 	.gem_free_object = radeon_gem_object_free,
 	.gem_open_object = radeon_gem_object_open,
 	.gem_close_object = radeon_gem_object_close,
-	.dma_ioctl = radeon_dma_ioctl_kms,
 	.dumb_create = radeon_mode_dumb_create,
 	.dumb_map_offset = radeon_mode_dumb_mmap,
 	.dumb_destroy = drm_gem_dumb_destroy,
