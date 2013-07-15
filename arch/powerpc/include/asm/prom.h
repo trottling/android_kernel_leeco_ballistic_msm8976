@@ -48,6 +48,8 @@ struct device_node *of_find_next_cache_node(struct device_node *np);
 
 extern void of_instantiate_rtc(void);
 
+extern int of_get_ibm_chip_id(struct device_node *np);
+
 /* The of_drconf_cell struct defines the layout of the LMB array
  * specified in the device tree property
  * ibm,dynamic-reconfiguration-memory/ibm,dynamic-memory
