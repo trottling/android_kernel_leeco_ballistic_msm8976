@@ -395,7 +395,8 @@ static struct platform_device *emev2_late_devices[] __initdata = {
 
 void __init emev2_add_standard_devices(void)
 {
-	emev2_clock_init();
+	if (!IS_ENABLED(CONFIG_COMMON_CLK))
+		emev2_clock_init();
 
 	platform_add_devices(emev2_early_devices,
 			     ARRAY_SIZE(emev2_early_devices));
