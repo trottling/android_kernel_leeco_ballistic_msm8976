@@ -75,7 +75,8 @@ static bool arch_timer_mem_use_virtual;
  * Architected system timer support.
  */
 
-static inline void arch_timer_reg_write(int access, int reg, u32 val,
+static __always_inline
+void arch_timer_reg_write(int access, enum arch_timer_reg reg, u32 val,
 					struct clock_event_device *clk)
 {
 	if (access == ARCH_TIMER_MEM_PHYS_ACCESS) {
@@ -107,7 +108,8 @@ static inline void arch_timer_reg_write(int access, int reg, u32 val,
 	}
 }
 
-static inline u32 arch_timer_reg_read(int access, int reg,
+static __always_inline
+u32 arch_timer_reg_read(int access, enum arch_timer_reg reg,
 				      struct clock_event_device *clk)
 {
 	u32 val;
@@ -143,7 +145,7 @@ static inline u32 arch_timer_reg_read(int access, int reg,
 	return val;
 }
 
-static inline irqreturn_t timer_handler(const int access,
+static __always_inline irqreturn_t timer_handler(const int access,
 					struct clock_event_device *evt)
 {
 	unsigned long ctrl;
@@ -186,7 +188,7 @@ static irqreturn_t arch_timer_handler_virt_mem(int irq, void *dev_id)
 	return timer_handler(ARCH_TIMER_MEM_VIRT_ACCESS, evt);
 }
 
-static inline void timer_set_mode(const int access, int mode,
+static __always_inline void timer_set_mode(const int access, int mode,
 				  struct clock_event_device *clk)
 {
 	unsigned long ctrl;
@@ -231,7 +233,7 @@ static void arch_timer_set_mode_phys_mem(enum clock_event_mode mode,
 	timer_set_mode(ARCH_TIMER_MEM_PHYS_ACCESS, mode, clk);
 }
 
-static inline void set_next_event(const int access, unsigned long evt,
+static __always_inline void set_next_event(const int access, unsigned long evt,
 				  struct clock_event_device *clk)
 {
 	unsigned long ctrl;
