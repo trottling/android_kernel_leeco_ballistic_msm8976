@@ -431,8 +431,8 @@ out:
  *	node.
  */
 
-static struct fib6_node * fib6_add_1(struct fib6_node *root, void *addr,
-				     int addrlen, int plen,
+static struct fib6_node *fib6_add_1(struct fib6_node *root,
+				     struct in6_addr *addr, int plen,
 				     int offset, int allow_create,
 				     int replace_required)
 {
@@ -549,7 +549,7 @@ insert_above:
 	   but if it is >= plen, the value is ignored in any case.
 	 */
 
-	bit = __ipv6_addr_diff(addr, &key->addr, addrlen);
+	bit = __ipv6_addr_diff(addr, &key->addr, sizeof(*addr));
 
 	/*
 	 *		(intermediate)[in]
@@ -852,9 +852,10 @@ int fib6_add(struct fib6_node *root, struct rt6_info *rt, struct nl_info *info)
 	if (!allow_create && !replace_required)
 		pr_warn("RTM_NEWROUTE with no NLM_F_CREATE or NLM_F_REPLACE\n");
 
-	fn = fib6_add_1(root, &rt->rt6i_dst.addr, sizeof(struct in6_addr),
-			rt->rt6i_dst.plen, offsetof(struct rt6_info, rt6i_dst),
-			allow_create, replace_required);
+	fn = fib6_add_1(root, &rt->rt6i_dst.addr, rt->rt6i_dst.plen,
+			offsetof(struct rt6_info, rt6i_dst), allow_create,
+			replace_required);
+
 	if (IS_ERR(fn)) {
 		err = PTR_ERR(fn);
 		fn = NULL;
@@ -893,7 +894,7 @@ int fib6_add(struct fib6_node *root, struct rt6_info *rt, struct nl_info *info)
 			/* Now add the first leaf node to new subtree */
 
 			sn = fib6_add_1(sfn, &rt->rt6i_src.addr,
-					sizeof(struct in6_addr), rt->rt6i_src.plen,
+					rt->rt6i_src.plen,
 					offsetof(struct rt6_info, rt6i_src),
 					allow_create, replace_required);
 
@@ -912,7 +913,7 @@ int fib6_add(struct fib6_node *root, struct rt6_info *rt, struct nl_info *info)
 			fn->subtree = sfn;
 		} else {
 			sn = fib6_add_1(fn->subtree, &rt->rt6i_src.addr,
-					sizeof(struct in6_addr), rt->rt6i_src.plen,
+					rt->rt6i_src.plen,
 					offsetof(struct rt6_info, rt6i_src),
 					allow_create, replace_required);
 
