@@ -290,6 +290,7 @@ extern int sysctl_tcp_thin_dupack;
 extern int sysctl_tcp_early_retrans;
 extern int sysctl_tcp_limit_output_bytes;
 extern int sysctl_tcp_challenge_ack_limit;
+extern unsigned int sysctl_tcp_notsent_lowat;
 extern int sysctl_tcp_min_tso_segs;
 extern int sysctl_tcp_autocorking;
 extern int sysctl_tcp_default_init_rwnd;
@@ -1565,6 +1566,19 @@ extern int tcp_gro_complete(struct sk_buff *skb);
 
 extern void __tcp_v4_send_check(struct sk_buff *skb, __be32 saddr,
 				__be32 daddr);
+
+static inline u32 tcp_notsent_lowat(const struct tcp_sock *tp)
+{
+	return tp->notsent_lowat ?: sysctl_tcp_notsent_lowat;
+}
+
+static inline bool tcp_stream_memory_free(const struct sock *sk)
+{
+	const struct tcp_sock *tp = tcp_sk(sk);
+	u32 notsent_bytes = tp->write_seq - tp->snd_nxt;
+
+	return notsent_bytes < tcp_notsent_lowat(tp);
+}
 
 extern int tcp_nuke_addr(struct net *net, struct sockaddr *addr);
 
