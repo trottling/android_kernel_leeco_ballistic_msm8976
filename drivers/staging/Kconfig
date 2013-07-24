@@ -116,6 +116,8 @@ source "drivers/staging/ozwpan/Kconfig"
 
 source "drivers/staging/gdm72xx/Kconfig"
 
+source "drivers/staging/gdm724x/Kconfig"
+
 source "drivers/staging/csr/Kconfig"
 
 source "drivers/staging/ti-soc-thermal/Kconfig"
