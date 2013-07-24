@@ -1478,7 +1478,7 @@ struct security_operations {
 	int (*inode_alloc_security) (struct inode *inode);
 	void (*inode_free_security) (struct inode *inode);
 	int (*inode_init_security) (struct inode *inode, struct inode *dir,
-				    const struct qstr *qstr, char **name,
+				    const struct qstr *qstr, const char **name,
 				    void **value, size_t *len);
 	int (*inode_create) (struct inode *dir,
 			     struct dentry *dentry, umode_t mode);
@@ -1758,7 +1758,7 @@ int security_inode_init_security(struct inode *inode, struct inode *dir,
 				 const struct qstr *qstr,
 				 initxattrs initxattrs, void *fs_data);
 int security_old_inode_init_security(struct inode *inode, struct inode *dir,
-				     const struct qstr *qstr, char **name,
+				     const struct qstr *qstr, const char **name,
 				     void **value, size_t *len);
 int security_inode_create(struct inode *dir, struct dentry *dentry, umode_t mode);
 int security_inode_post_create(struct inode *dir, struct dentry *dentry,
@@ -2095,8 +2095,8 @@ static inline int security_inode_init_security(struct inode *inode,
 static inline int security_old_inode_init_security(struct inode *inode,
 						   struct inode *dir,
 						   const struct qstr *qstr,
-						   char **name, void **value,
-						   size_t *len)
+						   const char **name,
+						   void **value, size_t *len)
 {
 	return -EOPNOTSUPP;
 }
