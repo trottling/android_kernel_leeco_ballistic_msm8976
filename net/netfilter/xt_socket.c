@@ -19,12 +19,12 @@
 #include <net/icmp.h>
 #include <net/sock.h>
 #include <net/inet_sock.h>
-#include <net/netfilter/nf_tproxy_core.h>
 #include <net/netfilter/ipv4/nf_defrag_ipv4.h>
 
 #if IS_ENABLED(CONFIG_IP6_NF_IPTABLES)
 #define XT_SOCKET_HAVE_IPV6 1
 #include <linux/netfilter_ipv6/ip6_tables.h>
+#include <net/inet6_hashtables.h>
 #include <net/netfilter/ipv6/nf_defrag_ipv6.h>
 #endif
 
@@ -102,6 +102,43 @@ extract_icmp4_fields(const struct sk_buff *skb,
 	return 0;
 }
 
+/* "socket" match based redirection (no specific rule)
+ * ===================================================
+ *
+ * There are connections with dynamic endpoints (e.g. FTP data
+ * connection) that the user is unable to add explicit rules
+ * for. These are taken care of by a generic "socket" rule. It is
+ * assumed that the proxy application is trusted to open such
+ * connections without explicit iptables rule (except of course the
+ * generic 'socket' rule). In this case the following sockets are
+ * matched in preference order:
+ *
+ *   - match: if there's a fully established connection matching the
+ *     _packet_ tuple
+ *
+ *   - match: if there's a non-zero bound listener (possibly with a
+ *     non-local address) We don't accept zero-bound listeners, since
+ *     then local services could intercept traffic going through the
+ *     box.
+ */
+static struct sock *
+xt_socket_get_sock_v4(struct net *net, const u8 protocol,
+		      const __be32 saddr, const __be32 daddr,
+		      const __be16 sport, const __be16 dport,
+		      const struct net_device *in)
+{
+	switch (protocol) {
+	case IPPROTO_TCP:
+		return __inet_lookup(net, &tcp_hashinfo,
+				     saddr, sport, daddr, dport,
+				     in->ifindex);
+	case IPPROTO_UDP:
+		return udp4_lib_lookup(net, saddr, sport, daddr, dport,
+				       in->ifindex);
+	}
+	return NULL;
+}
+
 struct sock*
 xt_socket_get4_sk(const struct sk_buff *skb, struct xt_action_param *par)
 {
@@ -155,9 +192,9 @@ xt_socket_get4_sk(const struct sk_buff *skb, struct xt_action_param *par)
 	}
 #endif
 
-	sk = nf_tproxy_get_sock_v4(dev_net(skb->dev), protocol,
+	sk = xt_socket_get_sock_v4(dev_net(skb->dev), protocol,
 				   saddr, daddr, sport, dport,
-				   par->in, NFT_LOOKUP_ANY);
+				   par->in);
 
 	pr_debug("proto %hhu %pI4:%hu -> %pI4:%hu (orig %pI4:%hu) sock %p\n",
 		 protocol, &saddr, ntohs(sport),
@@ -281,6 +318,25 @@ extract_icmp6_fields(const struct sk_buff *skb,
 	return 0;
 }
 
+static struct sock *
+xt_socket_get_sock_v6(struct net *net, const u8 protocol,
+		      const struct in6_addr *saddr, const struct in6_addr *daddr,
+		      const __be16 sport, const __be16 dport,
+		      const struct net_device *in)
+{
+	switch (protocol) {
+	case IPPROTO_TCP:
+		return inet6_lookup(net, &tcp_hashinfo,
+				    saddr, sport, daddr, dport,
+				    in->ifindex);
+	case IPPROTO_UDP:
+		return udp6_lib_lookup(net, saddr, sport, daddr, dport,
+				       in->ifindex);
+	}
+
+	return NULL;
+}
+
 struct sock*
 xt_socket_get6_sk(const struct sk_buff *skb, struct xt_action_param *par)
 {
@@ -316,9 +372,9 @@ xt_socket_get6_sk(const struct sk_buff *skb, struct xt_action_param *par)
 		return NULL;
 	}
 
-	sk = nf_tproxy_get_sock_v6(dev_net(skb->dev), tproto,
+	sk = xt_socket_get_sock_v6(dev_net(skb->dev), tproto,
 				   saddr, daddr, sport, dport,
-				   par->in, NFT_LOOKUP_ANY);
+				   par->in);
 
 	pr_debug("proto %hhd %pI6:%hu -> %pI6:%hu "
 		 "(orig %pI6:%hu) sock %p\n",
