@@ -33,7 +33,7 @@ static int qlcnic_sriov_alloc_bc_mbx_args(struct qlcnic_cmd_args *, u32);
 static void qlcnic_sriov_vf_poll_dev_state(struct work_struct *);
 static void qlcnic_sriov_vf_cancel_fw_work(struct qlcnic_adapter *);
 static void qlcnic_sriov_cleanup_transaction(struct qlcnic_bc_trans *);
-static int qlcnic_sriov_vf_mbx_op(struct qlcnic_adapter *,
+static int qlcnic_sriov_issue_cmd(struct qlcnic_adapter *,
 				  struct qlcnic_cmd_args *);
 
 static struct qlcnic_hardware_ops qlcnic_sriov_vf_hw_ops = {
@@ -44,7 +44,7 @@ static struct qlcnic_hardware_ops qlcnic_sriov_vf_hw_ops = {
 	.get_mac_address		= qlcnic_83xx_get_mac_address,
 	.setup_intr			= qlcnic_83xx_setup_intr,
 	.alloc_mbx_args			= qlcnic_83xx_alloc_mbx_args,
-	.mbx_cmd			= qlcnic_sriov_vf_mbx_op,
+	.mbx_cmd			= qlcnic_sriov_issue_cmd,
 	.get_func_no			= qlcnic_83xx_get_func_no,
 	.api_lock			= qlcnic_83xx_cam_lock,
 	.api_unlock			= qlcnic_83xx_cam_unlock,
@@ -291,7 +291,7 @@ static int qlcnic_sriov_post_bc_msg(struct qlcnic_adapter *adapter, u32 *hdr,
 
 	opcode = ((struct qlcnic_bc_hdr *)hdr)->cmd_op;
 
-	if (!test_bit(QLC_83XX_MBX_READY, &adapter->ahw->idc.status)) {
+	if (!test_bit(QLC_83XX_MBX_READY, &ahw->idc.status)) {
 		dev_info(&adapter->pdev->dev,
 			 "Mailbox cmd attempted, 0x%x\n", opcode);
 		dev_info(&adapter->pdev->dev, "Mailbox detached\n");
@@ -1078,6 +1078,7 @@ static void qlcnic_sriov_process_bc_cmd(struct work_struct *work)
 	if (test_bit(QLC_BC_VF_FLR, &vf->state))
 		return;
 
+	memset(&cmd, 0, sizeof(struct qlcnic_cmd_args));
 	trans = list_first_entry(&vf->rcv_act.wait_list,
 				 struct qlcnic_bc_trans, list);
 	adapter = vf->adapter;
@@ -1227,6 +1228,7 @@ static void qlcnic_sriov_handle_bc_cmd(struct qlcnic_sriov *sriov,
 		return;
 	}
 
+	memset(&cmd, 0, sizeof(struct qlcnic_cmd_args));
 	cmd_op = hdr->cmd_op;
 	if (qlcnic_sriov_alloc_bc_trans(&trans))
 		return;
@@ -1352,7 +1354,7 @@ int qlcnic_sriov_cfg_bc_intr(struct qlcnic_adapter *adapter, u8 enable)
 	if (enable)
 		cmd.req.arg[1] = (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7);
 
-	err = qlcnic_83xx_mbx_op(adapter, &cmd);
+	err = qlcnic_83xx_issue_cmd(adapter, &cmd);
 
 	if (err != QLCNIC_RCODE_SUCCESS) {
 		dev_err(&adapter->pdev->dev,
@@ -1384,7 +1386,7 @@ static int qlcnic_sriov_retry_bc_cmd(struct qlcnic_adapter *adapter,
 	return -EIO;
 }
 
-static int qlcnic_sriov_vf_mbx_op(struct qlcnic_adapter *adapter,
+static int qlcnic_sriov_issue_cmd(struct qlcnic_adapter *adapter,
 				  struct qlcnic_cmd_args *cmd)
 {
 	struct qlcnic_hardware_context *ahw = adapter->ahw;
@@ -1404,7 +1406,7 @@ static int qlcnic_sriov_vf_mbx_op(struct qlcnic_adapter *adapter,
 		goto cleanup_transaction;
 
 retry:
-	if (!test_bit(QLC_83XX_MBX_READY, &adapter->ahw->idc.status)) {
+	if (!test_bit(QLC_83XX_MBX_READY, &ahw->idc.status)) {
 		rsp = -EIO;
 		QLCDB(adapter, DRV, "MBX not Ready!(cmd 0x%x) for VF 0x%x\n",
 		      QLCNIC_MBX_RSP(cmd->req.arg[0]), func);
@@ -1607,7 +1609,7 @@ static int qlcnic_sriov_vf_reinit_driver(struct qlcnic_adapter *adapter)
 	int err;
 
 	set_bit(QLC_83XX_MBX_READY, &adapter->ahw->idc.status);
-	qlcnic_83xx_enable_mbx_intrpt(adapter);
+	qlcnic_83xx_enable_mbx_interrupt(adapter);
 
 	err = qlcnic_sriov_cfg_bc_intr(adapter, 1);
 	if (err)
@@ -1983,7 +1985,7 @@ int qlcnic_sriov_vf_resume(struct qlcnic_adapter *adapter)
 	int err;
 
 	set_bit(QLC_83XX_MODULE_LOADED, &idc->status);
-	qlcnic_83xx_enable_mbx_intrpt(adapter);
+	qlcnic_83xx_enable_mbx_interrupt(adapter);
 	err = qlcnic_sriov_cfg_bc_intr(adapter, 1);
 	if (err)
 		return err;
