@@ -257,7 +257,6 @@ static const struct file_operations radeon_driver_old_fops = {
 	.unlocked_ioctl = drm_ioctl,
 	.mmap = drm_mmap,
 	.poll = drm_poll,
-	.fasync = drm_fasync,
 	.read = drm_read,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl = radeon_compat_ioctl,
@@ -366,7 +365,6 @@ static const struct file_operations radeon_driver_kms_fops = {
 	.unlocked_ioctl = drm_ioctl,
 	.mmap = radeon_mmap,
 	.poll = drm_poll,
-	.fasync = drm_fasync,
 	.read = drm_read,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl = radeon_kms_compat_ioctl,
