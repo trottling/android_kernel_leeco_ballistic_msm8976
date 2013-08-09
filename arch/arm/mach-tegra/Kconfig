@@ -15,6 +15,8 @@ config ARCH_TEGRA
 	select SOC_BUS
 	select SPARSE_IRQ
 	select USE_OF
+	select MIGHT_HAVE_PCI
+	select ARCH_SUPPORTS_MSI
 	help
 	  This enables support for NVIDIA Tegra based systems.
 
@@ -67,11 +69,6 @@ config ARCH_TEGRA_114_SOC
 	help
 	  Support for NVIDIA Tegra T114 processor family, based on the
 	  ARM CortexA15MP CPU
-
-config TEGRA_PCI
-	bool "PCI Express support"
-	depends on ARCH_TEGRA_2x_SOC
-	select PCI
 
 config TEGRA_AHB
 	bool "Enable AHB driver for NVIDIA Tegra SoCs"
