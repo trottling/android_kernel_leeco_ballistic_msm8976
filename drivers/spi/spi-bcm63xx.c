@@ -481,8 +481,7 @@ static int bcm63xx_spi_remove(struct platform_device *pdev)
 #ifdef CONFIG_PM
 static int bcm63xx_spi_suspend(struct device *dev)
 {
-	struct spi_master *master =
-			platform_get_drvdata(to_platform_device(dev));
+	struct spi_master *master = dev_get_drvdata(dev);
 	struct bcm63xx_spi *bs = spi_master_get_devdata(master);
 
 	spi_master_suspend(master);
@@ -494,8 +493,7 @@ static int bcm63xx_spi_suspend(struct device *dev)
 
 static int bcm63xx_spi_resume(struct device *dev)
 {
-	struct spi_master *master =
-			platform_get_drvdata(to_platform_device(dev));
+	struct spi_master *master = dev_get_drvdata(dev);
 	struct bcm63xx_spi *bs = spi_master_get_devdata(master);
 
 	clk_prepare_enable(bs->clk);
