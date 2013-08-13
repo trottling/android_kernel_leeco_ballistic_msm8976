@@ -468,7 +468,7 @@ int ip_tunnel_rcv(struct ip_tunnel *tunnel, struct sk_buff *skb,
 		skb->dev = tunnel->dev;
 	}
 
-	if (tunnel->net != dev_net(tunnel->dev))
+	if (!net_eq(tunnel->net, dev_net(tunnel->dev)))
 		skb_scrub_packet(skb);
 
 	gro_cells_receive(&tunnel->gro_cells, skb);
@@ -614,7 +614,7 @@ void ip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev,
 	}
 #endif
 
-	if (tunnel->net != dev_net(dev))
+	if (!net_eq(tunnel->net, dev_net(dev)))
 		skb_scrub_packet(skb);
 
 	if (tunnel->err_count > 0) {
