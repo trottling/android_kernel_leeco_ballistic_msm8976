@@ -463,6 +463,10 @@ int ip_tunnel_rcv(struct ip_tunnel *tunnel, struct sk_buff *skb,
 	} else {
 		skb->dev = tunnel->dev;
 	}
+
+	if (tunnel->net != dev_net(tunnel->dev))
+		skb_scrub_packet(skb);
+
 	gro_cells_receive(&tunnel->gro_cells, skb);
 	return 0;
 
