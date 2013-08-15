@@ -29,6 +29,7 @@
 #include <linux/idr.h>
 #include <linux/notifier.h>
 #include <linux/err.h>
+#include <trace/events/iommu.h>
 #include <linux/scatterlist.h>
 
 static struct kset *iommu_group_kset;
