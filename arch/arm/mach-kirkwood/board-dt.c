@@ -93,6 +93,7 @@ static void __init kirkwood_dt_init(void)
 	/* Setup clocks for legacy devices */
 	kirkwood_legacy_clk_init();
 
+	kirkwood_pm_init();
 	kirkwood_cpuidle_init();
 
 #ifdef CONFIG_KEXEC
