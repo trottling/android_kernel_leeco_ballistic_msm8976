@@ -154,6 +154,8 @@ config MACH_BOCKW
 	select ARCH_REQUIRE_GPIOLIB
 	select RENESAS_INTC_IRQPIN
 	select USE_OF
+	select SND_SOC_AK4554 if SND_SIMPLE_CARD
+	select SND_SOC_AK4642 if SND_SIMPLE_CARD
 
 config MACH_BOCKW_REFERENCE
 	bool "BOCK-W  - Reference Device Tree Implementation"
