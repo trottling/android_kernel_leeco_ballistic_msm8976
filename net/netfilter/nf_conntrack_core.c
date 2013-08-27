@@ -39,6 +39,7 @@
 #include <net/netfilter/nf_conntrack_l4proto.h>
 #include <net/netfilter/nf_conntrack_expect.h>
 #include <net/netfilter/nf_conntrack_helper.h>
+#include <net/netfilter/nf_conntrack_seqadj.h>
 #include <net/netfilter/nf_conntrack_core.h>
 #include <net/netfilter/nf_conntrack_extend.h>
 #include <net/netfilter/nf_conntrack_acct.h>
@@ -1396,6 +1397,7 @@ void nf_conntrack_cleanup_end(void)
 	nf_ct_extend_unregister(&nf_ct_zone_extend);
 #endif
 	nf_conntrack_proto_fini();
+	nf_conntrack_seqadj_fini();
 	nf_conntrack_labels_fini();
 	nf_conntrack_helper_fini();
 	nf_conntrack_timeout_fini();
@@ -1601,6 +1603,10 @@ int nf_conntrack_init_start(void)
 	if (ret < 0)
 		goto err_labels;
 
+	ret = nf_conntrack_seqadj_init();
+	if (ret < 0)
+		goto err_seqadj;
+
 #ifdef CONFIG_NF_CONNTRACK_ZONES
 	ret = nf_ct_extend_register(&nf_ct_zone_extend);
 	if (ret < 0)
@@ -1625,6 +1631,8 @@ err_proto:
 	nf_ct_extend_unregister(&nf_ct_zone_extend);
 err_extend:
 #endif
+	nf_conntrack_seqadj_fini();
+err_seqadj:
 	nf_conntrack_labels_fini();
 err_labels:
 	nf_conntrack_helper_fini();
@@ -1647,9 +1655,6 @@ void nf_conntrack_init_end(void)
 	/* For use by REJECT target */
 	RCU_INIT_POINTER(ip_ct_attach, nf_conntrack_attach);
 	RCU_INIT_POINTER(nf_ct_destroy, destroy_conntrack);
-
-	/* Howto get NAT offsets */
-	RCU_INIT_POINTER(nf_ct_nat_offset, NULL);
 }
 
 /*
@@ -1736,8 +1741,3 @@ err_slabname:
 err_stat:
 	return ret;
 }
-
-s32 (*nf_ct_nat_offset)(const struct nf_conn *ct,
-			enum ip_conntrack_dir dir,
-			u32 seq);
-EXPORT_SYMBOL_GPL(nf_ct_nat_offset);
