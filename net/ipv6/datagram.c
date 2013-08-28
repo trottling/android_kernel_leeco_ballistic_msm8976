@@ -174,7 +174,7 @@ ipv4_connected:
 	final_p = fl6_update_dst(&fl6, opt, &final);
 	rcu_read_unlock();
 
-	dst = ip6_dst_lookup_flow(sk, &fl6, final_p, true);
+	dst = ip6_dst_lookup_flow(sk, &fl6, final_p);
 	err = 0;
 	if (IS_ERR(dst)) {
 		err = PTR_ERR(dst);
