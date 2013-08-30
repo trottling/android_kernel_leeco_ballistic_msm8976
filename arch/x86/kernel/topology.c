@@ -65,6 +65,7 @@ int __ref _debug_hotplug_cpu(int cpu, int action)
 	if (!cpu_is_hotpluggable(cpu))
 		return -EINVAL;
 
+	lock_device_hotplug();
 	cpu_hotplug_driver_lock();
 
 	switch (action) {
@@ -88,6 +89,7 @@ int __ref _debug_hotplug_cpu(int cpu, int action)
 	}
 
 	cpu_hotplug_driver_unlock();
+	unlock_device_hotplug();
 
 	return ret;
 }
