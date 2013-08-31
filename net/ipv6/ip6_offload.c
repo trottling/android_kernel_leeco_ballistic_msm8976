@@ -91,6 +91,7 @@ static struct sk_buff *ipv6_gso_segment(struct sk_buff *skb,
 	unsigned int unfrag_ip6hlen;
 	u8 *prevhdr;
 	int offset = 0;
+	bool tunnel;
 
 	if (unlikely(skb_shinfo(skb)->gso_type &
 		     ~(SKB_GSO_UDP |
@@ -108,6 +109,7 @@ static struct sk_buff *ipv6_gso_segment(struct sk_buff *skb,
 	if (unlikely(!pskb_may_pull(skb, sizeof(*ipv6h))))
 		goto out;
 
+	tunnel = skb->encapsulation;
 	ipv6h = ipv6_hdr(skb);
 	__skb_pull(skb, sizeof(*ipv6h));
 	segs = ERR_PTR(-EPROTONOSUPPORT);
@@ -128,7 +130,7 @@ static struct sk_buff *ipv6_gso_segment(struct sk_buff *skb,
 		ipv6h = ipv6_hdr(skb);
 		ipv6h->payload_len = htons(skb->len - skb->mac_len -
 					   sizeof(*ipv6h));
-		if (proto == IPPROTO_UDP) {
+		if (!tunnel && proto == IPPROTO_UDP) {
 			unfrag_ip6hlen = ip6_find_1stfragopt(skb, &prevhdr);
 			fptr = (struct frag_hdr *)(skb_network_header(skb) +
 				unfrag_ip6hlen);
