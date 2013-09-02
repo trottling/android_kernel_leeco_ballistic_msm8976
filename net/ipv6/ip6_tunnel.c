@@ -819,14 +819,12 @@ static int ip6_tnl_rcv(struct sk_buff *skb, __u16 protocol,
 			rcu_read_unlock();
 			goto discard;
 		}
-		secpath_reset(skb);
 		skb->mac_header = skb->network_header;
 		skb_reset_network_header(skb);
 		skb->protocol = htons(protocol);
-		skb->pkt_type = PACKET_HOST;
 		memset(skb->cb, 0, sizeof(struct inet6_skb_parm));
 
-		__skb_tunnel_rx(skb, t->dev);
+		__skb_tunnel_rx(skb, t->dev, t->net);
 
 		err = dscp_ecn_decapsulate(t, ipv6h, skb);
 		if (unlikely(err)) {
@@ -847,9 +845,6 @@ static int ip6_tnl_rcv(struct sk_buff *skb, __u16 protocol,
 		tstats->rx_packets++;
 		tstats->rx_bytes += skb->len;
 		u64_stats_update_end(&tstats->syncp);
-
-		if (!net_eq(t->net, dev_net(t->dev)))
-			skb_scrub_packet(skb, true);
 
 		netif_rx(skb);
 
