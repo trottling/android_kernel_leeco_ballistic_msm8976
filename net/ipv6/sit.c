@@ -916,9 +916,6 @@ static netdev_tx_t ipip6_tunnel_xmit(struct sk_buff *skb,
 			tunnel->err_count = 0;
 	}
 
-	if (!net_eq(tunnel->net, dev_net(dev)))
-		skb_scrub_packet(skb, true);
-
 	/*
 	 * Okay, now see if we can stuff it in the buffer as-is.
 	 */
@@ -950,7 +947,7 @@ static netdev_tx_t ipip6_tunnel_xmit(struct sk_buff *skb,
 	}
 
 	err = iptunnel_xmit(rt, skb, fl4.saddr, fl4.daddr, IPPROTO_IPV6, tos,
-			    ttl, df);
+			    ttl, df, !net_eq(tunnel->net, dev_net(dev)));
 	iptunnel_xmit_stats(err, &dev->stats, dev->tstats);
 	return NETDEV_TX_OK;
 
