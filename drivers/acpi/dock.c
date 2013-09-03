@@ -502,7 +502,7 @@ static void handle_dock(struct dock_station *ds, int dock)
 	acpi_status status;
 	struct acpi_object_list arg_list;
 	union acpi_object arg;
-	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
+	unsigned long long value;
 
 	acpi_handle_info(ds->handle, "%s\n", dock ? "docking" : "undocking");
 
@@ -511,12 +511,10 @@ static void handle_dock(struct dock_station *ds, int dock)
 	arg_list.pointer = &arg;
 	arg.type = ACPI_TYPE_INTEGER;
 	arg.integer.value = dock;
-	status = acpi_evaluate_object(ds->handle, "_DCK", &arg_list, &buffer);
+	status = acpi_evaluate_integer(ds->handle, "_DCK", &arg_list, &value);
 	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND)
 		acpi_handle_err(ds->handle, "Failed to execute _DCK (0x%x)\n",
 				status);
-
-	kfree(buffer.pointer);
 }
 
 static inline void dock(struct dock_station *ds)
