@@ -29,6 +29,7 @@
 #include <linux/tracehook.h>
 #include <linux/audit.h>
 #include <linux/seccomp.h>
+#include <linux/ftrace.h>
 
 #include <asm/byteorder.h>
 #include <asm/cpu.h>
@@ -42,6 +43,9 @@
 #include <asm/uaccess.h>
 #include <asm/bootinfo.h>
 #include <asm/reg.h>
+
+#define CREATE_TRACE_POINTS
+#include <trace/events/syscalls.h>
 
 /*
  * Called by kernel/ptrace.c when detaching..
@@ -663,6 +667,9 @@ asmlinkage void syscall_trace_enter(struct pt_regs *regs)
 	if (test_thread_flag(TIF_SYSCALL_TRACE))
 		ptrace_report_syscall(regs);
 
+	if (unlikely(test_thread_flag(TIF_SYSCALL_TRACEPOINT)))
+		trace_sys_enter(regs, regs->regs[2]);
+
 	audit_syscall_entry(__syscall_get_arch(),
 			    regs->regs[2],
 			    regs->regs[4], regs->regs[5],
@@ -683,6 +690,9 @@ asmlinkage void syscall_trace_leave(struct pt_regs *regs)
 	user_exit();
 
 	audit_syscall_exit(regs);
+
+	if (unlikely(test_thread_flag(TIF_SYSCALL_TRACEPOINT)))
+		trace_sys_exit(regs, regs->regs[2]);
 
 	if (test_thread_flag(TIF_SYSCALL_TRACE))
 		tracehook_report_syscall_exit(regs, 0);
