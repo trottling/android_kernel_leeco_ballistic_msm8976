@@ -172,7 +172,7 @@ void rcu_irq_enter(void)
 	rcu_idle_exit_common(oldval);
 	local_irq_restore(flags);
 }
-EXPORT_SYMBOL_GPL(rcu_irq_enter);
+#if defined(CONFIG_DEBUG_LOCK_ALLOC) || defined(CONFIG_RCU_TRACE)
 
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
 
