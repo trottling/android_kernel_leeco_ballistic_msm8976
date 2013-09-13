@@ -10,8 +10,8 @@
 #include <linux/filter.h>
 #include <linux/init.h>
 #include <asm/cacheflush.h>
-#include <asm/processor.h>
 #include <asm/facility.h>
+#include <asm/dis.h>
 
 /*
  * Conventions:
