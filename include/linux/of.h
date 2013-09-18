@@ -210,6 +210,8 @@ extern struct device_node *of_get_next_available_child(
 extern struct device_node *of_get_child_by_name(const struct device_node *node,
 					const char *name);
 
+/* cache lookup */
+extern struct device_node *of_find_next_cache_node(const struct device_node *);
 extern struct device_node *of_find_node_with_property(
 	struct device_node *from, const char *prop_name);
 
