@@ -55,7 +55,7 @@ static void of_spmi_sum_resources(struct of_spmi_res_info *r_info,
 	uint32_t flags;
 	int i = 0;
 
-	while (of_irq_map_one(r_info->node, i, &oirq) == 0)
+	while (of_irq_parse_one(r_info->node, i, &oirq) == 0)
 		i++;
 
 	r_info->num_irq += i;
