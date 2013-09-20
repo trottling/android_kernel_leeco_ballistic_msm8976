@@ -1478,6 +1478,9 @@ int kvm_vcpu_ioctl_get_one_reg(struct kvm_vcpu *vcpu, struct kvm_one_reg *reg)
 	case KVM_REG_PPC_DEBUG_INST:
 		val = get_reg_val(reg->id, KVMPPC_INST_EHPRIV);
 		break;
+	case KVM_REG_PPC_VRSAVE:
+		val = get_reg_val(reg->id, vcpu->arch.vrsave);
+		break;
 	default:
 		r = kvmppc_get_one_reg(vcpu, reg->id, &val);
 		break;
@@ -1551,6 +1554,9 @@ int kvm_vcpu_ioctl_set_one_reg(struct kvm_vcpu *vcpu, struct kvm_one_reg *reg)
 		kvmppc_set_tcr(vcpu, tcr);
 		break;
 	}
+	case KVM_REG_PPC_VRSAVE:
+		vcpu->arch.vrsave = set_reg_val(reg->id, val);
+		break;
 	default:
 		r = kvmppc_set_one_reg(vcpu, reg->id, &val);
 		break;
