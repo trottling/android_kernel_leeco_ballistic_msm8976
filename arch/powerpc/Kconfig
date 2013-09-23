@@ -139,6 +139,9 @@ config PPC
 	select HAVE_DEBUG_STACKOVERFLOW
 	select ARCH_SUPPORTS_ATOMIC_RMW
 
+config GENERIC_CSUM
+	def_bool CPU_LITTLE_ENDIAN
+
 config EARLY_PRINTK
 	bool
 	default y
