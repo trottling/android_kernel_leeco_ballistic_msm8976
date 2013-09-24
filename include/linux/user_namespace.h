@@ -32,6 +32,12 @@ struct user_namespace {
 	kgid_t			group;
 	unsigned int		proc_inum;
 	unsigned long		flags;
+
+	/* Register of per-UID persistent keyrings for this namespace */
+#ifdef CONFIG_PERSISTENT_KEYRINGS
+	struct key		*persistent_keyring_register;
+	struct rw_semaphore	persistent_keyring_register_sem;
+#endif
 };
 
 extern struct user_namespace init_user_ns;

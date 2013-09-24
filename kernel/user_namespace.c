@@ -108,6 +108,9 @@ int create_user_ns(struct cred *new)
 
 	set_cred_user_ns(new, ns);
 
+#ifdef CONFIG_PERSISTENT_KEYRINGS
+	init_rwsem(&ns->persistent_keyring_register_sem);
+#endif
 	return 0;
 }
 
@@ -137,6 +140,9 @@ void free_user_ns(struct user_namespace *ns)
 
 	do {
 		parent = ns->parent;
+#ifdef CONFIG_PERSISTENT_KEYRINGS
+		key_put(ns->persistent_keyring_register);
+#endif
 		proc_free_inum(ns->proc_inum);
 		kmem_cache_free(user_ns_cachep, ns);
 		ns = parent;
