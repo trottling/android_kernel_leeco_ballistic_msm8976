@@ -139,7 +139,7 @@ getuserbychan (int channum)
     mch_t      *ch;
 
     ch = c4_find_chan (channum);
-    return ch ? ch->user : 0;
+    return ch ? ch->user : NULL;
 }
 
 
@@ -251,7 +251,7 @@ c4_wq_port_cleanup (mpi_t * pi)
     {
         destroy_workqueue (pi->wq_port);        /* this also calls
                                                  * flush_workqueue() */
-        pi->wq_port = 0;
+        pi->wq_port = NULL;
     }
 }
 
@@ -426,7 +426,7 @@ create_chan (struct net_device * ndev, ci_t * ci,
     int         ret;
 
     if (c4_find_chan (cp->channum))
-        return 0;                   /* channel already exists */
+        return NULL;                   /* channel already exists */
 
     {
         struct c4_priv *priv;
@@ -436,14 +436,14 @@ create_chan (struct net_device * ndev, ci_t * ci,
         if (!priv)
         {
             pr_warning("%s: no memory for net_device !\n", ci->devname);
-            return 0;
+	    return NULL;
         }
         dev = alloc_hdlcdev (priv);
         if (!dev)
         {
             pr_warning("%s: no memory for hdlc_device !\n", ci->devname);
             OS_kfree (priv);
-            return 0;
+	    return NULL;
         }
         priv->ci = ci;
         priv->channum = cp->channum;
@@ -502,7 +502,7 @@ create_chan (struct net_device * ndev, ci_t * ci,
             pr_info("%s: create_chan[%d] registration error = %d.\n",
                     ci->devname, cp->channum, ret);
         free_netdev (dev);          /* cleanup */
-        return 0;                   /* failed to register */
+	return NULL;		/* failed to register */
     }
     return dev;
 }
@@ -750,7 +750,7 @@ do_deluser (struct net_device * ndev, int lockit)
         ch = c4_find_chan (channum);
         if (ch == NULL)
             return -ENOENT;
-        ch->user = 0;               /* will be freed, below */
+	ch->user = NULL;	/* will be freed, below */
     }
 
     if (lockit)
@@ -965,7 +965,7 @@ c4_add_dev (hdw_info_t * hi, int brdno, unsigned long f0, unsigned long f1,
     {
         pr_warning("%s: no memory for struct net_device !\n", hi->devname);
         error_flag = ENOMEM;
-        return 0;
+	return NULL;
     }
     ci = (ci_t *)(netdev_priv(ndev));
     ndev->irq = irq0;
@@ -976,7 +976,7 @@ c4_add_dev (hdw_info_t * hi, int brdno, unsigned long f0, unsigned long f1,
     c4_list = ci;
     ci->brdno = ci->next ? ci->next->brdno + 1 : 0;
 
-    if (CI == 0)
+    if (!CI)
         CI = ci;                    /* DEBUG, only board 0 usage */
 
     strcpy (ci->devname, hi->devname);
@@ -1002,7 +1002,7 @@ c4_add_dev (hdw_info_t * hi, int brdno, unsigned long f0, unsigned long f1,
         OS_kfree (netdev_priv(ndev));
         OS_kfree (ndev);
         error_flag = ENODEV;
-        return 0;
+	return NULL;
     }
     /*************************************************************
      *  int request_irq(unsigned int irq,
@@ -1028,7 +1028,7 @@ c4_add_dev (hdw_info_t * hi, int brdno, unsigned long f0, unsigned long f1,
         OS_kfree (netdev_priv(ndev));
         OS_kfree (ndev);
         error_flag = EIO;
-        return 0;
+	return NULL;
     }
 #ifdef CONFIG_SBE_PMCC4_NCOMM
     if (request_irq (irq1, &c4_ebus_interrupt, IRQF_SHARED, ndev->name, ndev))
@@ -1039,7 +1039,7 @@ c4_add_dev (hdw_info_t * hi, int brdno, unsigned long f0, unsigned long f1,
         OS_kfree (netdev_priv(ndev));
         OS_kfree (ndev);
         error_flag = EIO;
-        return 0;
+	return NULL;
     }
 #endif
 
@@ -1097,7 +1097,7 @@ c4_add_dev (hdw_info_t * hi, int brdno, unsigned long f0, unsigned long f1,
         free_irq (irq0, ndev);
         OS_kfree (netdev_priv(ndev));
         OS_kfree (ndev);
-        return 0;                   /* failure, error_flag is set */
+	return NULL;		/* failure, error_flag is set */
     }
     return ndev;
 }
