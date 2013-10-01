@@ -13,7 +13,6 @@ config ARCH_HIGHBANK
 	select ARM_PSCI
 	select ARM_TIMER_SP804
 	select CACHE_L2X0
-	select CLKDEV_LOOKUP
 	select COMMON_CLK
 	select CPU_V7
 	select GENERIC_CLOCKEVENTS
