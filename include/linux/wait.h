@@ -182,6 +182,14 @@ wait_queue_head_t *bit_waitqueue(void *, int);
 #define wake_up_interruptible_sync_poll(x, m)				\
 	__wake_up_sync_key((x), TASK_INTERRUPTIBLE, 1, (void *) (m))
 
+#define ___wait_cond_timeout(condition, ret)				\
+({									\
+ 	bool __cond = (condition);					\
+ 	if (__cond && !ret)						\
+ 		ret = 1;						\
+ 	__cond || !ret;							\
+})
+
 #define __wait_event(wq, condition) 					\
 do {									\
 	DEFINE_WAIT(__wait);						\
@@ -220,14 +228,10 @@ do {									\
 									\
 	for (;;) {							\
 		prepare_to_wait(&wq, &__wait, TASK_UNINTERRUPTIBLE);	\
-		if (condition)						\
+		if (___wait_cond_timeout(condition, ret))		\
 			break;						\
 		ret = schedule_timeout(ret);				\
-		if (!ret)						\
-			break;						\
 	}								\
-	if (!ret && (condition))					\
-		ret = 1;						\
 	finish_wait(&wq, &__wait);					\
 } while (0)
 
@@ -302,18 +306,14 @@ do {									\
 									\
 	for (;;) {							\
 		prepare_to_wait(&wq, &__wait, TASK_INTERRUPTIBLE);	\
-		if (condition)						\
+		if (___wait_cond_timeout(condition, ret))		\
 			break;						\
 		if (signal_pending(current)) {				\
 			ret = -ERESTARTSYS;				\
 			break;						\
 		}							\
 		ret = schedule_timeout(ret);				\
-		if (!ret)						\
-			break;						\
 	}								\
-	if (!ret && (condition))					\
-		ret = 1;						\
 	finish_wait(&wq, &__wait);					\
 } while (0)
 
@@ -905,7 +905,7 @@ do {									\
 									\
 	for (;;) {							\
 		prepare_to_wait(&wq, &__wait, TASK_INTERRUPTIBLE);	\
-		if (condition)						\
+		if (___wait_cond_timeout(condition, ret))		\
 			break;						\
 		if (signal_pending(current)) {				\
 			ret = -ERESTARTSYS;				\
@@ -914,8 +914,6 @@ do {									\
 		spin_unlock_irq(&lock);					\
 		ret = schedule_timeout(ret);				\
 		spin_lock_irq(&lock);					\
-		if (!ret)						\
-			break;						\
 	}								\
 	finish_wait(&wq, &__wait);					\
 } while (0)
