@@ -86,22 +86,18 @@ static inline void __a2mp_cl_bredr(struct a2mp_cl *cl)
 /* hci_dev_list shall be locked */
 static void __a2mp_add_cl(struct amp_mgr *mgr, struct a2mp_cl *cl)
 {
-	int i = 0;
 	struct hci_dev *hdev;
+	int i = 1;
 
 	__a2mp_cl_bredr(cl);
 
 	list_for_each_entry(hdev, &hci_dev_list, list) {
-		/* Iterate through AMP controllers */
-		if (hdev->dev_type != HCI_AMP)
-			continue;
-
-		/* Starting from second entry */
-		++i;
-
-		cl[i].id = hdev->id;
-		cl[i].type = hdev->amp_type;
-		cl[i].status = hdev->amp_status;
+		if (hdev->dev_type == HCI_AMP) {
+			cl[i].id = hdev->id;
+			cl[i].type = hdev->amp_type;
+			cl[i].status = hdev->amp_status;
+			i++;
+		}
 	}
 }
 
