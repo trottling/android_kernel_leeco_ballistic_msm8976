@@ -323,6 +323,7 @@ static void dump_common_audit_data(struct audit_buffer *ab,
 						"faddr", "fport");
 				break;
 			}
+#if IS_ENABLED(CONFIG_IPV6)
 			case AF_INET6: {
 				struct inet_sock *inet = inet_sk(sk);
 
@@ -334,6 +335,7 @@ static void dump_common_audit_data(struct audit_buffer *ab,
 						"faddr", "fport");
 				break;
 			}
+#endif
 			case AF_UNIX:
 				u = unix_sk(sk);
 				if (u->path.dentry) {
