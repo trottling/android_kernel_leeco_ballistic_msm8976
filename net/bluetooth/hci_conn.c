@@ -29,8 +29,8 @@
 
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci_core.h>
-#include <net/bluetooth/smp.h>
 
+#include "smp.h"
 #include "a2mp.h"
 
 static void hci_le_create_connection(struct hci_conn *conn)
