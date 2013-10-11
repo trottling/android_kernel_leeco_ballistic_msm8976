@@ -180,6 +180,8 @@ source "drivers/android/Kconfig"
 
 source "drivers/coresight/Kconfig"
 
+source "drivers/powercap/Kconfig"
+
 source "drivers/bif/Kconfig"
 
 source "drivers/sensors/Kconfig"
