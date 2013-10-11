@@ -417,7 +417,7 @@ out:
 
 /**
  * zfcp_dbf_san_req - trace event for issued SAN request
- * @tag: indentifier for event
+ * @tag: identifier for event
  * @fsf_req: request containing issued CT data
  * d_id: destination ID
  */
@@ -487,7 +487,7 @@ static u16 zfcp_dbf_san_res_cap_len_if_gpn_ft(char *tag,
 
 /**
  * zfcp_dbf_san_res - trace event for received SAN request
- * @tag: indentifier for event
+ * @tag: identifier for event
  * @fsf_req: request containing issued CT data
  */
 void zfcp_dbf_san_res(char *tag, struct zfcp_fsf_req *fsf)
@@ -504,7 +504,7 @@ void zfcp_dbf_san_res(char *tag, struct zfcp_fsf_req *fsf)
 
 /**
  * zfcp_dbf_san_in_els - trace event for incoming ELS
- * @tag: indentifier for event
+ * @tag: identifier for event
  * @fsf_req: request containing issued CT data
  */
 void zfcp_dbf_san_in_els(char *tag, struct zfcp_fsf_req *fsf)
