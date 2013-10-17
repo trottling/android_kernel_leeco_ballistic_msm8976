@@ -1099,6 +1099,7 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
 	return 0;
 
 setup_exit:
+	pm_runtime_put(&sdd->pdev->dev);
 	/* setup() returns with device de-selected */
 	writel(S3C64XX_SPI_SLAVE_SIG_INACT, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
 	disable_cs(sdd, spi);
