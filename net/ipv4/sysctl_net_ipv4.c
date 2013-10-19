@@ -221,14 +221,6 @@ static int proc_allowed_congestion_control(struct ctl_table *ctl,
 	return ret;
 }
 
-static int ipv4_tcp_mem(struct ctl_table *ctl, int write,
-			   void __user *buffer, size_t *lenp,
-			   loff_t *ppos)
-{
-	ctl->data = &current->nsproxy->net_ns->ipv4.sysctl_tcp_mem;
-	return proc_doulongvec_minmax(ctl, write, buffer, lenp, ppos);
-}
-
 static int proc_tcp_fastopen_key(struct ctl_table *ctl, int write,
 				 void __user *buffer, size_t *lenp,
 				 loff_t *ppos)
@@ -548,6 +540,13 @@ static struct ctl_table ipv4_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec
+	},
+	{
+		.procname	= "tcp_mem",
+		.maxlen		= sizeof(sysctl_tcp_mem),
+		.data		= &sysctl_tcp_mem,
+		.mode		= 0644,
+		.proc_handler	= proc_doulongvec_minmax,
 	},
 	{
 		.procname	= "tcp_wmem",
@@ -919,12 +918,6 @@ static struct ctl_table ipv4_net_table[] = {
 		.proc_handler	= ipv4_local_port_range,
 	},
 	{
-		.procname	= "tcp_mem",
-		.maxlen		= sizeof(init_net.ipv4.sysctl_tcp_mem),
-		.mode		= 0644,
-		.proc_handler	= ipv4_tcp_mem,
-	},
-	{
 		.procname	= "fwmark_reflect",
 		.data		= &init_net.ipv4.sysctl_fwmark_reflect,
 		.maxlen		= sizeof(int),
@@ -988,8 +981,6 @@ static __net_init int ipv4_sysctl_init_net(struct net *net)
 	seqlock_init(&net->ipv4.sysctl_local_ports.lock);
 	net->ipv4.sysctl_local_ports.range[0] =  32768;
 	net->ipv4.sysctl_local_ports.range[1] =  61000;
-
-	tcp_init_mem(net);
 
 	net->ipv4.ipv4_hdr = register_net_sysctl(net, "net/ipv4", table);
 	if (net->ipv4.ipv4_hdr == NULL)
