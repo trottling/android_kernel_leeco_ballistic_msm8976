@@ -589,7 +589,7 @@ int drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev, int crtc,
 {
 	ktime_t stime, etime, mono_time_offset;
 	struct timeval tv_etime;
-	int vbl_status, vtotal, vdisplay;
+	int vbl_status;
 	int vpos, hpos, i;
 	s64 framedur_ns, linedur_ns, pixeldur_ns, delta_ns, duration_ns;
 	bool invbl;
@@ -605,9 +605,6 @@ int drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev, int crtc,
 		return -EIO;
 	}
 
-	vtotal = mode->crtc_vtotal;
-	vdisplay = mode->crtc_vdisplay;
-
 	/* Durations of frames, lines, pixels in nanoseconds. */
 	framedur_ns = refcrtc->framedur_ns;
 	linedur_ns  = refcrtc->linedur_ns;
@@ -616,7 +613,7 @@ int drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev, int crtc,
 	/* If mode timing undefined, just return as no-op:
 	 * Happens during initial modesetting of a crtc.
 	 */
-	if (vtotal <= 0 || vdisplay <= 0 || framedur_ns == 0) {
+	if (framedur_ns == 0) {
 		DRM_DEBUG("crtc %d: Noop due to uninitialized mode.\n", crtc);
 		return -EAGAIN;
 	}
@@ -682,24 +679,6 @@ int drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev, int crtc,
 	 * can be negative if start of scanout hasn't happened yet.
 	 */
 	delta_ns = (s64) vpos * linedur_ns + (s64) hpos * pixeldur_ns;
-
-	/* Is vpos outside nominal vblank area, but less than
-	 * 1/100 of a frame height away from start of vblank?
-	 * If so, assume this isn't a massively delayed vblank
-	 * interrupt, but a vblank interrupt that fired a few
-	 * microseconds before true start of vblank. Compensate
-	 * by adding a full frame duration to the final timestamp.
-	 * Happens, e.g., on ATI R500, R600.
-	 *
-	 * We only do this if DRM_CALLED_FROM_VBLIRQ.
-	 */
-	if ((flags & DRM_CALLED_FROM_VBLIRQ) && !invbl &&
-	    ((vdisplay - vpos) < vtotal / 100)) {
-		delta_ns = delta_ns - framedur_ns;
-
-		/* Signal this correction as "applied". */
-		vbl_status |= 0x8;
-	}
 
 	if (!drm_timestamp_monotonic)
 		etime = ktime_sub(etime, mono_time_offset);
