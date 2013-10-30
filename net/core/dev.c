@@ -6403,6 +6403,16 @@ void netdev_set_default_ethtool_ops(struct net_device *dev,
 }
 EXPORT_SYMBOL_GPL(netdev_set_default_ethtool_ops);
 
+void netdev_freemem(struct net_device *dev)
+{
+	char *addr = (char *)dev - dev->padded;
+
+	if (is_vmalloc_addr(addr))
+		vfree(addr);
+	else
+		kfree(addr);
+}
+
 /**
  *	alloc_netdev_mqs - allocate network device
  *	@sizeof_priv:	size of private data to allocate space for
@@ -6446,7 +6456,9 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 	/* ensure 32-byte alignment of whole construct */
 	alloc_size += NETDEV_ALIGN - 1;
 
-	p = kzalloc(alloc_size, GFP_KERNEL);
+	p = kzalloc(alloc_size, GFP_KERNEL | __GFP_NOWARN | __GFP_REPEAT);
+	if (!p)
+		p = vzalloc(alloc_size);
 	if (!p)
 		return NULL;
 
@@ -6455,7 +6467,7 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 
 	dev->pcpu_refcnt = alloc_percpu(int);
 	if (!dev->pcpu_refcnt)
-		goto free_p;
+		goto free_dev;
 
 	if (dev_addr_init(dev))
 		goto free_pcpu;
@@ -6508,8 +6520,8 @@ free_pcpu:
 	kfree(dev->_rx);
 #endif
 
-free_p:
-	kfree(p);
+free_dev:
+	netdev_freemem(dev);
 	return NULL;
 }
 EXPORT_SYMBOL(alloc_netdev_mqs);
@@ -6546,7 +6558,7 @@ void free_netdev(struct net_device *dev)
 
 	/*  Compatibility with error handling in drivers */
 	if (dev->reg_state == NETREG_UNINITIALIZED) {
-		kfree((char *)dev - dev->padded);
+		netdev_freemem(dev);
 		return;
 	}
 
