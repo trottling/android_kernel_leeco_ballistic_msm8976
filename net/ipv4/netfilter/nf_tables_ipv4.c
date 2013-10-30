@@ -16,7 +16,6 @@
 #include <net/netfilter/nf_tables.h>
 #include <net/net_namespace.h>
 #include <net/ip.h>
-#include <net/net_namespace.h>
 #include <net/netfilter/nf_tables_ipv4.h>
 
 static unsigned int nft_do_chain_ipv4(const struct nf_hook_ops *ops,
