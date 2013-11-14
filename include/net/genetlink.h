@@ -42,9 +42,10 @@ struct genl_info;
  *	is given as the offset into the groups array)
  * @mcast_unbind: a socket was unbound from the given multicast group
  * @attrbuf: buffer to store parsed attributes
- * @ops_list: list of all assigned operations
  * @family_list: family list
  * @mcast_groups: multicast groups list
+ * @ops: the operations supported by this family (private)
+ * @n_ops: number of operations supported by this family (private)
  */
 struct genl_family {
 	unsigned int		id;
@@ -63,7 +64,8 @@ struct genl_family {
 	int			(*mcast_bind)(struct net *net, int group);
 	void			(*mcast_unbind)(struct net *net, int group);
 	struct nlattr **	attrbuf;	/* private */
-	struct list_head	ops_list;	/* private */
+	struct genl_ops *	ops;		/* private */
+	unsigned int		n_ops;		/* private */
 	struct list_head	family_list;	/* private */
 	struct list_head	mcast_groups;	/* private */
 	struct module		*module;
@@ -124,7 +126,6 @@ struct genl_ops {
 	int		       (*dumpit)(struct sk_buff *skb,
 					 struct netlink_callback *cb);
 	int		       (*done)(struct netlink_callback *cb);
-	struct list_head	ops_list;
 };
 
 int __genl_register_family(struct genl_family *family);
