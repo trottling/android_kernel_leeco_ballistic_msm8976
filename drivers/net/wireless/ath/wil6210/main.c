@@ -714,8 +714,8 @@ int wil_reset(struct wil6210_priv *wil, bool load_fw)
 
 	/* init after reset */
 	wil->pending_connect_cid = -1;
-	INIT_COMPLETION(wil->wmi_ready);
-	INIT_COMPLETION(wil->wmi_call);
+	reinit_completion(&wil->wmi_ready);
+	reinit_completion(&wil->wmi_call);
 
 	if (load_fw) {
 		wil_configure_interrupt_moderation(wil);
