@@ -353,7 +353,7 @@ out:
 	return NOTIFY_DONE;
 }
 
-static struct genl_ops dropmon_ops[] = {
+static const struct genl_ops dropmon_ops[] = {
 	{
 		.cmd = NET_DM_CMD_CONFIG,
 		.doit = net_dm_cmd_config,
