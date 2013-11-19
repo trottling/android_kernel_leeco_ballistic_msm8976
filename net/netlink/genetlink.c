@@ -70,7 +70,8 @@ static unsigned long mc_group_start = 0x1;
 static unsigned long *mc_groups = &mc_group_start;
 static unsigned long mc_groups_longs = 1;
 
-static int genl_ctrl_event(int event, void *data);
+static int genl_ctrl_event(int event, struct genl_family *family,
+			   struct genl_multicast_group *grp);
 
 static inline unsigned int genl_family_hash(unsigned int id)
 {
@@ -223,9 +224,8 @@ int genl_register_mc_group(struct genl_family *family,
 	grp->id = id;
 	set_bit(id, mc_groups);
 	list_add_tail(&grp->list, &family->mcast_groups);
-	grp->family = family;
 
-	genl_ctrl_event(CTRL_CMD_NEWMCAST_GRP, grp);
+	genl_ctrl_event(CTRL_CMD_NEWMCAST_GRP, family, grp);
  out:
 	genl_unlock_all();
 	return err;
@@ -236,7 +236,6 @@ static void __genl_unregister_mc_group(struct genl_family *family,
 				       struct genl_multicast_group *grp)
 {
 	struct net *net;
-	BUG_ON(grp->family != family);
 
 	netlink_table_grab();
 	rcu_read_lock();
@@ -247,9 +246,8 @@ static void __genl_unregister_mc_group(struct genl_family *family,
 
 	clear_bit(grp->id, mc_groups);
 	list_del(&grp->list);
-	genl_ctrl_event(CTRL_CMD_DELMCAST_GRP, grp);
+	genl_ctrl_event(CTRL_CMD_DELMCAST_GRP, family, grp);
 	grp->id = 0;
-	grp->family = NULL;
 }
 
 static void genl_unregister_mc_groups(struct genl_family *family)
@@ -351,7 +349,7 @@ int __genl_register_family(struct genl_family *family)
 	list_add_tail(&family->family_list, genl_family_chain(family->id));
 	genl_unlock_all();
 
-	genl_ctrl_event(CTRL_CMD_NEWFAMILY, family);
+	genl_ctrl_event(CTRL_CMD_NEWFAMILY, family, NULL);
 
 	return 0;
 
@@ -387,7 +385,7 @@ int genl_unregister_family(struct genl_family *family)
 		genl_unlock_all();
 
 		kfree(family->attrbuf);
-		genl_ctrl_event(CTRL_CMD_DELFAMILY, family);
+		genl_ctrl_event(CTRL_CMD_DELFAMILY, family, NULL);
 		return 0;
 	}
 
@@ -680,7 +678,8 @@ nla_put_failure:
 	return -EMSGSIZE;
 }
 
-static int ctrl_fill_mcgrp_info(struct genl_multicast_group *grp, u32 portid,
+static int ctrl_fill_mcgrp_info(struct genl_family *family,
+				struct genl_multicast_group *grp, u32 portid,
 				u32 seq, u32 flags, struct sk_buff *skb,
 				u8 cmd)
 {
@@ -692,8 +691,8 @@ static int ctrl_fill_mcgrp_info(struct genl_multicast_group *grp, u32 portid,
 	if (hdr == NULL)
 		return -1;
 
-	if (nla_put_string(skb, CTRL_ATTR_FAMILY_NAME, grp->family->name) ||
-	    nla_put_u16(skb, CTRL_ATTR_FAMILY_ID, grp->family->id))
+	if (nla_put_string(skb, CTRL_ATTR_FAMILY_NAME, family->name) ||
+	    nla_put_u16(skb, CTRL_ATTR_FAMILY_ID, family->id))
 		goto nla_put_failure;
 
 	nla_grps = nla_nest_start(skb, CTRL_ATTR_MCAST_GROUPS);
@@ -770,7 +769,8 @@ static struct sk_buff *ctrl_build_family_msg(struct genl_family *family,
 	return skb;
 }
 
-static struct sk_buff *ctrl_build_mcgrp_msg(struct genl_multicast_group *grp,
+static struct sk_buff *ctrl_build_mcgrp_msg(struct genl_family *family,
+					    struct genl_multicast_group *grp,
 					    u32 portid, int seq, u8 cmd)
 {
 	struct sk_buff *skb;
@@ -780,7 +780,7 @@ static struct sk_buff *ctrl_build_mcgrp_msg(struct genl_multicast_group *grp,
 	if (skb == NULL)
 		return ERR_PTR(-ENOBUFS);
 
-	err = ctrl_fill_mcgrp_info(grp, portid, seq, 0, skb, cmd);
+	err = ctrl_fill_mcgrp_info(family, grp, portid, seq, 0, skb, cmd);
 	if (err < 0) {
 		nlmsg_free(skb);
 		return ERR_PTR(err);
@@ -842,11 +842,10 @@ static int ctrl_getfamily(struct sk_buff *skb, struct genl_info *info)
 	return genlmsg_reply(msg, info);
 }
 
-static int genl_ctrl_event(int event, void *data)
+static int genl_ctrl_event(int event, struct genl_family *family,
+			   struct genl_multicast_group *grp)
 {
 	struct sk_buff *msg;
-	struct genl_family *family;
-	struct genl_multicast_group *grp;
 
 	/* genl is still initialising */
 	if (!init_net.genl_sock)
@@ -855,14 +854,13 @@ static int genl_ctrl_event(int event, void *data)
 	switch (event) {
 	case CTRL_CMD_NEWFAMILY:
 	case CTRL_CMD_DELFAMILY:
-		family = data;
+		WARN_ON(grp);
 		msg = ctrl_build_family_msg(family, 0, 0, event);
 		break;
 	case CTRL_CMD_NEWMCAST_GRP:
 	case CTRL_CMD_DELMCAST_GRP:
-		grp = data;
-		family = grp->family;
-		msg = ctrl_build_mcgrp_msg(data, 0, 0, event);
+		BUG_ON(!grp);
+		msg = ctrl_build_mcgrp_msg(family, grp, 0, 0, event);
 		break;
 	default:
 		return -EINVAL;
