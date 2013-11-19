@@ -126,6 +126,10 @@ out:
 	return skb;
 }
 
+static struct genl_multicast_group dm_mcgrp = {
+	.name = "events",
+};
+
 static void send_dm_alert(struct work_struct *work)
 {
 	struct sk_buff *skb;
@@ -136,7 +140,7 @@ static void send_dm_alert(struct work_struct *work)
 	skb = reset_per_cpu_data(data);
 
 	if (skb)
-		genlmsg_multicast(skb, 0, NET_DM_GRP_ALERT, GFP_KERNEL);
+		genlmsg_multicast(skb, 0, dm_mcgrp.id, GFP_KERNEL);
 }
 
 /*
@@ -390,6 +394,13 @@ static int __init init_net_drop_monitor(void)
 		pr_err("Could not create drop monitor netlink family\n");
 		return rc;
 	}
+
+	rc = genl_register_mc_group(&net_drop_monitor_family, &dm_mcgrp);
+	if (rc) {
+		pr_err("Failed to register drop monitor mcast group\n");
+		goto out_unreg;
+	}
+	WARN_ON(dm_mcgrp.id != NET_DM_GRP_ALERT);
 
 	rc = register_netdevice_notifier(&dropmon_net_notifier);
 	if (rc < 0) {
