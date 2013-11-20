@@ -160,10 +160,8 @@ static int tegra_target(struct cpufreq_policy *policy,
 
 	mutex_lock(&tegra_cpu_lock);
 
-	if (is_suspended) {
-		ret = -EBUSY;
+	if (is_suspended)
 		goto out;
-	}
 
 	cpufreq_frequency_table_target(policy, freq_table, target_freq,
 		relation, &idx);
