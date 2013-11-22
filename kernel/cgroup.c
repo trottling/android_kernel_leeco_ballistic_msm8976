@@ -178,8 +178,8 @@ static int cgroup_addrm_files(struct cgroup *cgrp, struct cftype cfts[],
  * keep accessing it outside the said locks.  This function may return
  * %NULL if @cgrp doesn't have @subsys_id enabled.
  */
-struct cgroup_subsys_state *cgroup_css(struct cgroup *cgrp,
-				       struct cgroup_subsys *ss)
+static struct cgroup_subsys_state *cgroup_css(struct cgroup *cgrp,
+					      struct cgroup_subsys *ss)
 {
 	if (ss)
 		return rcu_dereference_check(cgrp->subsys[ss->subsys_id],
@@ -2591,14 +2591,6 @@ static const struct inode_operations cgroup_dir_inode_operations = {
 	.listxattr = cgroup_listxattr,
 	.removexattr = cgroup_removexattr,
 };
-
-static struct dentry *cgroup_lookup(struct inode *dir, struct dentry *dentry, unsigned int flags)
-{
-	if (dentry->d_name.len > NAME_MAX)
-		return ERR_PTR(-ENAMETOOLONG);
-	d_add(dentry, NULL);
-	return NULL;
-}
 
 /*
  * Check if a file is a control file
