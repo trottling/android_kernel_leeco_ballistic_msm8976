@@ -58,7 +58,7 @@ static int cpu0_set_target(struct cpufreq_policy *policy,
 	}
 
 	freq_Hz = clk_round_rate(cpu_clk, freq_table[index].frequency * 1000);
-	if (freq_Hz < 0)
+	if (freq_Hz <= 0)
 		freq_Hz = freq_table[index].frequency * 1000;
 	freq_exact = freq_Hz;
 	freqs.new = freq_Hz / 1000;
