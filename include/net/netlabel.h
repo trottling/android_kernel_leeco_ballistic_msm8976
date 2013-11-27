@@ -114,7 +114,7 @@ struct calipso_doi;
 struct netlbl_audit {
 	u32 secid;
 	kuid_t loginuid;
-	u32 sessionid;
+	unsigned int sessionid;
 };
 
 /*
