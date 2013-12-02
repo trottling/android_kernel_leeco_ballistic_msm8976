@@ -272,7 +272,7 @@ struct key *key_alloc(struct key_type *type, const char *desc,
 	}
 
 	/* allocate and initialise the key and its description */
-	key = kmem_cache_alloc(key_jar, GFP_KERNEL);
+	key = kmem_cache_zalloc(key_jar, GFP_KERNEL);
 	if (!key)
 		goto no_memory_2;
 
@@ -293,10 +293,6 @@ struct key *key_alloc(struct key_type *type, const char *desc,
 	key->uid = uid;
 	key->gid = gid;
 	key->perm = perm;
-	key->flags = 0;
-	key->expiry = 0;
-	key->payload.data = NULL;
-	key->security = NULL;
 
 	if (!(flags & KEY_ALLOC_NOT_IN_QUOTA))
 		key->flags |= 1 << KEY_FLAG_IN_QUOTA;
@@ -304,8 +300,6 @@ struct key *key_alloc(struct key_type *type, const char *desc,
 		key->flags |= 1 << KEY_FLAG_TRUSTED;
 	if (flags & KEY_ALLOC_UID_KEYRING)
 		key->flags |= 1 << KEY_FLAG_UID_KEYRING;
-
-	memset(&key->type_data, 0, sizeof(key->type_data));
 
 #ifdef KEY_DEBUGGING
 	key->magic = KEY_DEBUG_MAGIC;
