@@ -158,6 +158,7 @@ static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
 }
 
 static struct cpufreq_driver imx6q_cpufreq_driver = {
+	.flags = CPUFREQ_NEED_INITIAL_FREQ_CHECK,
 	.verify = cpufreq_generic_frequency_table_verify,
 	.target = imx6q_set_target,
 	.get = imx6q_get_speed,
