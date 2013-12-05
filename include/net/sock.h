@@ -1071,7 +1071,6 @@ enum cg_proto_flags {
 };
 
 struct cg_proto {
-	void			(*enter_memory_pressure)(struct sock *sk);
 	struct res_counter	memory_allocated;	/* Current allocated memory. */
 	struct percpu_counter	sockets_allocated;	/* Current number of sockets. */
 	int			memory_pressure;
@@ -1191,8 +1190,7 @@ static inline void sk_leave_memory_pressure(struct sock *sk)
 		struct proto *prot = sk->sk_prot;
 
 		for (; cg_proto; cg_proto = parent_cg_proto(prot, cg_proto))
-			if (cg_proto->memory_pressure)
-				cg_proto->memory_pressure = 0;
+			cg_proto->memory_pressure = 0;
 	}
 
 }
@@ -1207,7 +1205,7 @@ static inline void sk_enter_memory_pressure(struct sock *sk)
 		struct proto *prot = sk->sk_prot;
 
 		for (; cg_proto; cg_proto = parent_cg_proto(prot, cg_proto))
-			cg_proto->enter_memory_pressure(sk);
+			cg_proto->memory_pressure = 1;
 	}
 
 	sk->sk_prot->enter_memory_pressure(sk);
