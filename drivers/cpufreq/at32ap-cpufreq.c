@@ -75,7 +75,7 @@ static int at32_set_target(struct cpufreq_policy *policy,
 	return 0;
 }
 
-static int __init at32_cpufreq_driver_init(struct cpufreq_policy *policy)
+static int at32_cpufreq_driver_init(struct cpufreq_policy *policy)
 {
 	unsigned int frequency, rate, min_freq;
 	int retval, steps, i;
