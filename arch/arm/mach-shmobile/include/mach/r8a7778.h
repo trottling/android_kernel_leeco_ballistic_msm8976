@@ -19,7 +19,6 @@
 #define __ASM_R8A7778_H__
 
 #include <linux/sh_eth.h>
-#include <linux/platform_data/camera-rcar.h>
 
 extern void r8a7778_add_standard_devices(void);
 extern void r8a7778_add_standard_devices_dt(void);
