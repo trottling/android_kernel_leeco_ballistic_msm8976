@@ -26,7 +26,6 @@
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
-#include <linux/suspend.h>
 #include <linux/syscore_ops.h>
 #include <linux/tick.h>
 #include <trace/events/power.h>
@@ -54,9 +53,6 @@ struct cpufreq_cpu_save_data {
 };
 static DEFINE_PER_CPU(struct cpufreq_cpu_save_data, cpufreq_policy_save);
 #endif
-
-/* Flag to suspend/resume CPUFreq governors */
-static bool cpufreq_suspended;
 
 static inline bool has_target(void)
 {
@@ -1593,41 +1589,6 @@ static struct subsys_interface cpufreq_interface = {
 	.remove_dev	= cpufreq_remove_dev,
 };
 
-void cpufreq_suspend(void)
-{
-	struct cpufreq_policy *policy;
-
-	if (!has_target())
-		return;
-
-	pr_debug("%s: Suspending Governors\n", __func__);
-
-	list_for_each_entry(policy, &cpufreq_policy_list, policy_list)
-		if (__cpufreq_governor(policy, CPUFREQ_GOV_STOP))
-			pr_err("%s: Failed to stop governor for policy: %p\n",
-				__func__, policy);
-
-	cpufreq_suspended = true;
-}
-
-void cpufreq_resume(void)
-{
-	struct cpufreq_policy *policy;
-
-	if (!has_target())
-		return;
-
-	pr_debug("%s: Resuming Governors\n", __func__);
-
-	cpufreq_suspended = false;
-
-	list_for_each_entry(policy, &cpufreq_policy_list, policy_list)
-		if (__cpufreq_governor(policy, CPUFREQ_GOV_START)
-		    || __cpufreq_governor(policy, CPUFREQ_GOV_LIMITS))
-			pr_err("%s: Failed to start governor for policy: %p\n",
-				__func__, policy);
-}
-
 /**
  * cpufreq_bp_suspend - Prepare the boot CPU for system suspend.
  *
@@ -1946,10 +1907,6 @@ static int __cpufreq_governor(struct cpufreq_policy *policy,
 #else
 	struct cpufreq_governor *gov = NULL;
 #endif
-
-	/* Don't start any governor operations if we are entering suspend */
-	if (cpufreq_suspended)
-		return 0;
 
 	if (policy->governor->max_transition_latency &&
 	    policy->cpuinfo.transition_latency >
