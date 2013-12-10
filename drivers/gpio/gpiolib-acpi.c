@@ -314,7 +314,7 @@ struct gpio_desc *acpi_get_gpiod_by_index(struct device *dev, int index,
 	if (lookup.desc && info)
 		*info = lookup.info;
 
-	return lookup.desc ? lookup.desc : ERR_PTR(-ENODEV);
+	return lookup.desc ? lookup.desc : ERR_PTR(-ENOENT);
 }
 
 void acpi_gpiochip_add(struct gpio_chip *chip)
