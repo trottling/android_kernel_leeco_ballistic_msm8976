@@ -124,6 +124,7 @@ enum {
 	HCI_LINK_SECURITY,
 	HCI_PERIODIC_INQ,
 	HCI_FAST_CONNECTABLE,
+	HCI_6LOWPAN_ENABLED,
 };
 
 /* A mask for the flags that are supposed to remain when a reset happens

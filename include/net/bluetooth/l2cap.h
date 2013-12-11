@@ -132,6 +132,7 @@ struct l2cap_conninfo {
 /* L2CAP fixed channels */
 #define L2CAP_FC_L2CAP		0x02
 #define L2CAP_FC_A2MP		0x08
+#define L2CAP_FC_6LOWPAN        0x3e /* reserved and temporary value */
 
 /* L2CAP Control Field bit masks */
 #define L2CAP_CTRL_SAR			0xC000
