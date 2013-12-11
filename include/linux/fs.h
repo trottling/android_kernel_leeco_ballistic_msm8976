@@ -618,6 +618,9 @@ struct inode {
 	atomic_t		i_count;
 	atomic_t		i_dio_count;
 	atomic_t		i_writecount;
+#ifdef CONFIG_IMA
+	atomic_t		i_readcount; /* struct files open RO */
+#endif
 	const struct file_operations	*i_fop;	/* former ->i_op->default_file_ops */
 	struct file_lock	*i_flock;
 	struct address_space	i_data;
@@ -636,10 +639,6 @@ struct inode {
 #ifdef CONFIG_FSNOTIFY
 	__u32			i_fsnotify_mask; /* all events this inode cares about */
 	struct hlist_head	i_fsnotify_marks;
-#endif
-
-#ifdef CONFIG_IMA
-	atomic_t		i_readcount; /* struct files open RO */
 #endif
 
 #if IS_ENABLED(CONFIG_FS_ENCRYPTION)
