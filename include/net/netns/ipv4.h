@@ -70,6 +70,7 @@ struct netns_ipv4 {
 	struct local_ports sysctl_local_ports;
 
 	int sysctl_tcp_ecn;
+	int sysctl_ip_no_pmtu_disc;
 
 	int sysctl_fwmark_reflect;
 	int sysctl_tcp_fwmark_accept;
