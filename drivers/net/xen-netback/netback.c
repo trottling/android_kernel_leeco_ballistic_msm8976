@@ -1398,6 +1398,9 @@ static int checksum_setup_ip(struct xenvif *vif, struct sk_buff *skb,
 
 	err = -EPROTO;
 
+	if (fragment)
+		goto out;
+
 	switch (ip_hdr(skb)->protocol) {
 	case IPPROTO_TCP:
 		if (!skb_partial_csum_set(skb, off,
