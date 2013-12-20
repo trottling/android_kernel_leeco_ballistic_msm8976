@@ -20,6 +20,10 @@ if CPU_FREQ
 config CPU_FREQ_GOV_COMMON
 	bool
 
+config CPU_FREQ_BOOST_SW
+	bool
+	depends on THERMAL
+
 config SCHED_FREQ_INPUT
 	bool "Scheduler inputs to cpufreq governor"
 	depends on SCHED_HMP
