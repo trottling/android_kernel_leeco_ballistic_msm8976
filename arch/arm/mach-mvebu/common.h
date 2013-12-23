@@ -14,9 +14,8 @@
 
 #ifndef __ARCH_MVEBU_COMMON_H
 #define __ARCH_MVEBU_COMMON_H
-#include <linux/reboot.h>
 
-#define ARMADA_XP_MAX_CPUS 4
+#include <linux/reboot.h>
 
 void mvebu_restart(enum reboot_mode mode, const char *cmd);
 void armada_370_xp_init_irq(void);
