@@ -1545,7 +1545,7 @@ static void fib6_clean_tree(struct net *net, struct fib6_node *root,
 }
 
 void fib6_clean_all(struct net *net, int (*func)(struct rt6_info *, void *arg),
-		    int prune, void *arg)
+		    void *arg)
 {
 	struct fib6_table *table;
 	struct hlist_head *head;
@@ -1557,7 +1557,7 @@ void fib6_clean_all(struct net *net, int (*func)(struct rt6_info *, void *arg),
 		hlist_for_each_entry_rcu(table, head, tb6_hlist) {
 			write_lock_bh(&table->tb6_lock);
 			fib6_clean_tree(net, &table->tb6_root,
-					func, prune, arg);
+					func, 0, arg);
 			write_unlock_bh(&table->tb6_lock);
 		}
 	}
@@ -1651,7 +1651,7 @@ void fib6_run_gc(unsigned long expires, struct net *net, bool force)
 
 	gc_args.more = icmp6_dst_gc();
 
-	fib6_clean_all(net, fib6_age, 0, NULL);
+	fib6_clean_all(net, fib6_age, NULL);
 	now = jiffies;
 	net->ipv6.ip6_rt_last_gc = now;
 
