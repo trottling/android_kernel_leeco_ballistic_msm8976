@@ -29,7 +29,6 @@
 #include <linux/textsearch.h>
 #include <net/checksum.h>
 #include <linux/rcupdate.h>
-#include <linux/dmaengine.h>
 #include <linux/hrtimer.h>
 #include <linux/dma-mapping.h>
 #include <linux/netdev_features.h>
@@ -621,11 +620,8 @@ struct sk_buff {
 	__u32			hash;
 	__be16			vlan_proto;
 	__u16			vlan_tci;
-#if defined CONFIG_NET_DMA || defined CONFIG_NET_RX_BUSY_POLL
-	union {
-		unsigned int	napi_id;
-		dma_cookie_t	dma_cookie;
-	};
+#ifdef CONFIG_NET_RX_BUSY_POLL
+	unsigned int	napi_id;
 #endif
 #ifdef CONFIG_NETWORK_SECMARK
 	__u32			secmark;
