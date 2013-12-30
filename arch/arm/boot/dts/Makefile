@@ -64,6 +64,7 @@ dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
 dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
 	integratorcp.dtb
 kirkwood := \
+	kirkwood-b3.dtb \
 	kirkwood-cloudbox.dtb \
 	kirkwood-db-88f6281.dtb \
 	kirkwood-db-88f6282.dtb \
