@@ -426,6 +426,8 @@ struct nft_stats {
 	u64 pkts;
 };
 
+#define NFT_HOOK_OPS_MAX		2
+
 /**
  *	struct nft_base_chain - nf_tables base chain
  *
@@ -436,7 +438,7 @@ struct nft_stats {
  *	@chain: the chain
  */
 struct nft_base_chain {
-	struct nf_hook_ops		ops;
+	struct nf_hook_ops		ops[NFT_HOOK_OPS_MAX];
 	enum nft_chain_type		type;
 	u8				policy;
 	struct nft_stats __percpu	*stats;
@@ -480,6 +482,8 @@ struct nft_table {
  *	@nhooks: number of hooks in this family
  *	@owner: module owner
  *	@tables: used internally
+ *	@nops: number of hook ops in this family
+ *	@hook_ops_init: initialization function for chain hook ops
  *	@hooks: hookfn overrides for packet validation
  */
 struct nft_af_info {
@@ -488,6 +492,9 @@ struct nft_af_info {
 	unsigned int			nhooks;
 	struct module			*owner;
 	struct list_head		tables;
+	unsigned int			nops;
+	void				(*hook_ops_init)(struct nf_hook_ops *,
+							 unsigned int);
 	nf_hookfn			*hooks[NF_MAX_HOOKS];
 };
 
