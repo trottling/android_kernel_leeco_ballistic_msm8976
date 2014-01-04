@@ -163,10 +163,10 @@ int iptunnel_xmit(struct rtable *rt, struct sk_buff *skb,
 
 static inline void iptunnel_xmit_stats(int err,
 				       struct net_device_stats *err_stats,
-				       struct pcpu_tstats __percpu *stats)
+				       struct pcpu_sw_netstats __percpu *stats)
 {
 	if (err > 0) {
-		struct pcpu_tstats *tstats = this_cpu_ptr(stats);
+		struct pcpu_sw_netstats *tstats = this_cpu_ptr(stats);
 
 		u64_stats_update_begin(&tstats->syncp);
 		tstats->tx_bytes += err;
