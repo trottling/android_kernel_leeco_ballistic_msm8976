@@ -118,7 +118,9 @@ kirkwood := \
 	kirkwood-t5325.dtb \
 	kirkwood-topkick.dtb \
 	kirkwood-ts219-6281.dtb \
-	kirkwood-ts219-6282.dtb
+	kirkwood-ts219-6282.dtb \
+	kirkwood-ts419-6281.dtb \
+	kirkwood-ts419-6282.dtb
 dtb-$(CONFIG_ARCH_KIRKWOOD) += $(kirkwood)
 dtb-$(CONFIG_ARCH_LPC32XX) += ea3250.dtb phy3250.dtb
 dtb-$(CONFIG_ARCH_MARCO) += marco-evb.dtb
