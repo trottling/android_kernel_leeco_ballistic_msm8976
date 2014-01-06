@@ -356,14 +356,7 @@ static int __init gre_init(void)
 		goto err_gre;
 	}
 
-	if (gre_offload_init()) {
-		pr_err("can't add protocol offload\n");
-		goto err_gso;
-	}
-
 	return 0;
-err_gso:
-	gre_del_protocol(&ipgre_protocol, GREPROTO_CISCO);
 err_gre:
 	inet_del_protocol(&net_gre_protocol, IPPROTO_GRE);
 err:
@@ -372,8 +365,6 @@ err:
 
 static void __exit gre_exit(void)
 {
-	gre_offload_exit();
-
 	gre_del_protocol(&ipgre_protocol, GREPROTO_CISCO);
 	inet_del_protocol(&net_gre_protocol, IPPROTO_GRE);
 }
