@@ -14,6 +14,8 @@
 #include <linux/idr.h>
 #include <linux/slab.h>
 
+#include "gpiolib.h"
+
 #define CREATE_TRACE_POINTS
 #include <trace/events/gpio.h>
 
@@ -1239,6 +1241,7 @@ int gpiochip_add(struct gpio_chip *chip)
 #endif
 
 	of_gpiochip_add(chip);
+	acpi_gpiochip_add(chip);
 
 	if (status)
 		goto fail;
@@ -1282,6 +1285,7 @@ int gpiochip_remove(struct gpio_chip *chip)
 
 	gpiochip_remove_pin_ranges(chip);
 	of_gpiochip_remove(chip);
+	acpi_gpiochip_remove(chip);
 
 	for (id = 0; id < chip->ngpio; id++) {
 		if (test_bit(FLAG_REQUESTED, &chip->desc[id].flags)) {
