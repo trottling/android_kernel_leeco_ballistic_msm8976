@@ -26,11 +26,6 @@ static struct exynos_dvfs_info *exynos_info;
 static struct regulator *arm_regulator;
 static unsigned int locking_frequency;
 
-static unsigned int exynos_getspeed(unsigned int cpu)
-{
-	return clk_get_rate(exynos_info->cpu_clk) / 1000;
-}
-
 static int exynos_cpufreq_get_index(unsigned int freq)
 {
 	struct cpufreq_frequency_table *freq_table = exynos_info->freq_table;
@@ -148,7 +143,7 @@ static struct cpufreq_driver exynos_driver = {
 	.flags		= CPUFREQ_STICKY | CPUFREQ_NEED_INITIAL_FREQ_CHECK,
 	.verify		= cpufreq_generic_frequency_table_verify,
 	.target_index	= exynos_target,
-	.get		= exynos_getspeed,
+	.get		= cpufreq_generic_get,
 	.init		= exynos_cpufreq_cpu_init,
 	.exit		= cpufreq_generic_exit,
 	.name		= "exynos_cpufreq",
