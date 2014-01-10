@@ -294,7 +294,7 @@ netdev_tx_t macvlan_start_xmit(struct sk_buff *skb,
 
 	if (vlan->fwd_priv) {
 		skb->dev = vlan->lowerdev;
-		ret = dev_hard_start_xmit(skb, skb->dev, NULL, vlan->fwd_priv);
+		ret = dev_queue_xmit_accel(skb, vlan->fwd_priv);
 	} else {
 		ret = macvlan_queue_xmit(skb, dev);
 	}
@@ -354,10 +354,8 @@ static int macvlan_open(struct net_device *dev)
 		 */
 		if (IS_ERR_OR_NULL(vlan->fwd_priv)) {
 			vlan->fwd_priv = NULL;
-		} else {
-			dev->features &= ~NETIF_F_LLTX;
+		} else
 			return 0;
-		}
 	}
 
 	err = -EBUSY;
@@ -691,8 +689,7 @@ static netdev_features_t macvlan_fix_features(struct net_device *dev,
 	features = netdev_increment_features(vlan->lowerdev->features,
 					     features,
 					     mask);
-	if (!vlan->fwd_priv)
-		features |= NETIF_F_LLTX;
+	features |= NETIF_F_LLTX;
 
 	return features;
 }
