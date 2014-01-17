@@ -2108,7 +2108,7 @@ int netif_set_real_num_tx_queues(struct net_device *dev, unsigned int txq)
 }
 EXPORT_SYMBOL(netif_set_real_num_tx_queues);
 
-#ifdef CONFIG_RPS
+#ifdef CONFIG_SYSFS
 /**
  *	netif_set_real_num_rx_queues - set actual number of RX queues used
  *	@dev: Network device
@@ -5964,7 +5964,7 @@ void netif_stacked_transfer_operstate(const struct net_device *rootdev,
 }
 EXPORT_SYMBOL(netif_stacked_transfer_operstate);
 
-#ifdef CONFIG_RPS
+#ifdef CONFIG_SYSFS
 static int netif_alloc_rx_queues(struct net_device *dev)
 {
 	unsigned int i, count = dev->num_rx_queues;
@@ -6505,7 +6505,7 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 		return NULL;
 	}
 
-#ifdef CONFIG_RPS
+#ifdef CONFIG_SYSFS
 	if (rxqs < 1) {
 		pr_err("alloc_netdev: Unable to allocate device with zero RX queues\n");
 		return NULL;
@@ -6561,7 +6561,7 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 	if (netif_alloc_netdev_queues(dev))
 		goto free_all;
 
-#ifdef CONFIG_RPS
+#ifdef CONFIG_SYSFS
 	dev->num_rx_queues = rxqs;
 	dev->real_num_rx_queues = rxqs;
 	if (netif_alloc_rx_queues(dev))
@@ -6582,7 +6582,7 @@ free_all:
 free_pcpu:
 	free_percpu(dev->pcpu_refcnt);
 	netif_free_tx_queues(dev);
-#ifdef CONFIG_RPS
+#ifdef CONFIG_SYSFS
 	kfree(dev->_rx);
 #endif
 
@@ -6607,7 +6607,7 @@ void free_netdev(struct net_device *dev)
 	release_net(dev_net(dev));
 
 	netif_free_tx_queues(dev);
-#ifdef CONFIG_RPS
+#ifdef CONFIG_SYSFS
 	kfree(dev->_rx);
 #endif
 
