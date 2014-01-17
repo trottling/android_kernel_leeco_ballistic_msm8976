@@ -498,6 +498,9 @@ static int tcp_v6_send_synack(struct sock *sk, struct dst_entry *dst,
 				    &ireq->ir_v6_rmt_addr);
 
 		fl6->daddr = ireq->ir_v6_rmt_addr;
+		if (np->repflow && (ireq->pktopts != NULL))
+			fl6->flowlabel = ip6_flowlabel(ipv6_hdr(ireq->pktopts));
+
 		skb_set_queue_mapping(skb, queue_mapping);
 		rcu_read_lock();
 		err = ip6_xmit(sk, skb, fl6, rcu_dereference(np->opt),
@@ -1054,7 +1057,8 @@ static int tcp_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 	if (!isn) {
 		if (ipv6_opt_accepted(sk, skb) ||
 		    np->rxopt.bits.rxinfo || np->rxopt.bits.rxoinfo ||
-		    np->rxopt.bits.rxhlim || np->rxopt.bits.rxohlim) {
+		    np->rxopt.bits.rxhlim || np->rxopt.bits.rxohlim ||
+		    np->repflow) {
 			atomic_inc(&skb->users);
 			ireq->pktopts = skb;
 		}
@@ -1181,6 +1185,8 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 		newnp->mcast_oif   = inet6_iif(skb);
 		newnp->mcast_hops  = ipv6_hdr(skb)->hop_limit;
 		newnp->rcv_flowinfo = ip6_flowinfo(ipv6_hdr(skb));
+		if (np->repflow)
+			newnp->flow_label = ip6_flowlabel(ipv6_hdr(skb));
 
 		/*
 		 * No need to charge this sock to the relevant IPv6 refcnt debug socks count
@@ -1264,6 +1270,8 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 	newnp->mcast_oif  = inet6_iif(skb);
 	newnp->mcast_hops = ipv6_hdr(skb)->hop_limit;
 	newnp->rcv_flowinfo = ip6_flowinfo(ipv6_hdr(skb));
+	if (np->repflow)
+		newnp->flow_label = ip6_flowlabel(ipv6_hdr(skb));
 
 	/* Clone native IPv6 options from listening socket (if any)
 
@@ -1474,6 +1482,8 @@ ipv6_pktoptions:
 			np->mcast_hops = ipv6_hdr(opt_skb)->hop_limit;
 		if (np->rxopt.bits.rxflow || np->rxopt.bits.rxtclass)
 			np->rcv_flowinfo = ip6_flowinfo(ipv6_hdr(opt_skb));
+		if (np->repflow)
+			np->flow_label = ip6_flowlabel(ipv6_hdr(opt_skb));
 		if (ipv6_opt_accepted(sk, opt_skb)) {
 			skb_set_owner_r(opt_skb, sk);
 			opt_skb = xchg(&np->pktoptions, opt_skb);
