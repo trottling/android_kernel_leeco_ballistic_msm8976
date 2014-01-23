@@ -513,7 +513,7 @@ static int cpu_psci_cpu_suspend(unsigned long state_id)
 		return  psci_ops.cpu_suspend(state_id, 0);
 }
 
-const struct cpu_operations cpu_psci_ops = {
+static const struct cpu_operations cpu_psci_ops = {
 	.name		= "psci",
 #ifdef CONFIG_SMP
 	.cpu_init	= cpu_psci_cpu_init,
@@ -529,4 +529,4 @@ const struct cpu_operations cpu_psci_ops = {
 #endif
 #endif
 };
-
+CPU_METHOD_OF_DECLARE(psci, &cpu_psci_ops);
