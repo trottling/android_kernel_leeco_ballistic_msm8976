@@ -1206,4 +1206,12 @@ int snd_pcm_add_usr_ctls(struct snd_pcm *pcm, int stream,
 			 unsigned long private_value,
 			 struct snd_pcm_usr **info_ret);
 
+/* printk helpers */
+#define pcm_err(pcm, fmt, args...) \
+	dev_err((pcm)->card->dev, fmt, ##args)
+#define pcm_warn(pcm, fmt, args...) \
+	dev_warn((pcm)->card->dev, fmt, ##args)
+#define pcm_dbg(pcm, fmt, args...) \
+	dev_dbg((pcm)->card->dev, fmt, ##args)
+
 #endif /* __SOUND_PCM_H */
