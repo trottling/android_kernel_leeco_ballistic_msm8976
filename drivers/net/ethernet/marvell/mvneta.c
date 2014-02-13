@@ -2767,7 +2767,7 @@ static int mvneta_probe(struct platform_device *pdev)
 	clk_prepare_enable(pp->clk);
 
 	/* Alloc per-cpu stats */
-	pp->stats = alloc_percpu(struct mvneta_pcpu_stats);
+	pp->stats = netdev_alloc_pcpu_stats(struct mvneta_pcpu_stats);
 	if (!pp->stats) {
 		err = -ENOMEM;
 		goto err_clk;
