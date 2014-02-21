@@ -70,6 +70,7 @@ int xfrm4_rcv_encap(struct sk_buff *skb, int nexthdr, __be32 spi,
 	struct xfrm4_protocol *handler;
 	struct xfrm4_protocol __rcu **head = proto_handlers(nexthdr);
 
+	XFRM_TUNNEL_SKB_CB(skb)->tunnel.ip4 = NULL;
 	XFRM_SPI_SKB_CB(skb)->family = AF_INET;
 	XFRM_SPI_SKB_CB(skb)->daddroff = offsetof(struct iphdr, daddr);
 
@@ -92,6 +93,8 @@ static int xfrm4_esp_rcv(struct sk_buff *skb)
 {
 	int ret;
 	struct xfrm4_protocol *handler;
+
+	XFRM_TUNNEL_SKB_CB(skb)->tunnel.ip4 = NULL;
 
 	for_each_protocol_rcu(esp4_handlers, handler)
 		if ((ret = handler->handler(skb)) != -EINVAL)
@@ -117,6 +120,8 @@ static int xfrm4_ah_rcv(struct sk_buff *skb)
 	int ret;
 	struct xfrm4_protocol *handler;
 
+	XFRM_TUNNEL_SKB_CB(skb)->tunnel.ip4 = NULL;
+
 	for_each_protocol_rcu(ah4_handlers, handler)
 		if ((ret = handler->handler(skb)) != -EINVAL)
 			return ret;
@@ -140,6 +145,8 @@ static int xfrm4_ipcomp_rcv(struct sk_buff *skb)
 {
 	int ret;
 	struct xfrm4_protocol *handler;
+
+	XFRM_TUNNEL_SKB_CB(skb)->tunnel.ip4 = NULL;
 
 	for_each_protocol_rcu(ipcomp4_handlers, handler)
 		if ((ret = handler->handler(skb)) != -EINVAL)
