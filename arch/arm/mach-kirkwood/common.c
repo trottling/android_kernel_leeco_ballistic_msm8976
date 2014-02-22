@@ -36,6 +36,7 @@
 #include <plat/time.h>
 #include <linux/platform_data/dma-mv_xor.h>
 #include "common.h"
+#include "pm.h"
 
 /*****************************************************************************
  * I/O Address Mapping

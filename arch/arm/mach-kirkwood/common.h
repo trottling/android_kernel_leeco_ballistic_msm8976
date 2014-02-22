@@ -58,12 +58,6 @@ void kirkwood_cpufreq_init(void);
 void kirkwood_restart(enum reboot_mode, const char *);
 void kirkwood_clk_init(void);
 
-#ifdef CONFIG_PM
-void kirkwood_pm_init(void);
-#else
-static inline void kirkwood_pm_init(void) {};
-#endif
-
 /* early init functions not converted to fdt yet */
 char *kirkwood_id(void);
 void kirkwood_l2_init(void);
