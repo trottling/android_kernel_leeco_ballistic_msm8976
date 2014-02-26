@@ -1666,9 +1666,6 @@ static int __bond_release_one(struct net_device *bond_dev,
 		return -EINVAL;
 	}
 
-	/* release the slave from its bond */
-	bond->slave_cnt--;
-
 	bond_sysfs_slave_del(slave);
 
 	bond_upper_dev_unlink(bond_dev, slave_dev);
@@ -1750,6 +1747,7 @@ static int __bond_release_one(struct net_device *bond_dev,
 
 	unblock_netpoll_tx();
 	synchronize_rcu();
+	bond->slave_cnt--;
 
 	if (!bond_has_slaves(bond)) {
 		call_netdevice_notifiers(NETDEV_CHANGEADDR, bond->dev);
