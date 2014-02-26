@@ -105,9 +105,9 @@ obj-$(CONFIG_SOC_IMX6SX) += clk-imx6sx.o mach-imx6sx.o
 
 AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
 obj-$(CONFIG_SUSPEND) += suspend-imx6.o
-obj-$(CONFIG_SOC_IMX6Q) += pm-imx6q.o headsmp.o
+obj-$(CONFIG_SOC_IMX6Q) += pm-imx6q.o
 # i.MX6SL reuses i.MX6Q code
-obj-$(CONFIG_SOC_IMX6SL) += pm-imx6q.o headsmp.o
+obj-$(CONFIG_SOC_IMX6SL) += pm-imx6q.o
 
 obj-$(CONFIG_SOC_IMX50) += mach-imx50.o
 obj-$(CONFIG_SOC_IMX51) += mach-imx51.o
