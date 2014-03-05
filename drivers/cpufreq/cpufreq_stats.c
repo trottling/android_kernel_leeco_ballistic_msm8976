@@ -22,7 +22,7 @@
 #include <linux/seq_file.h>
 #include <linux/slab.h>
 #include <linux/sort.h>
-#include <asm/cputime.h>
+#include <linux/cputime.h>
 
 #define UID_HASH_BITS 10
 
