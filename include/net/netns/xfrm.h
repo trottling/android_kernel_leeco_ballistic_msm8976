@@ -65,7 +65,6 @@ struct netns_xfrm {
 
 	/* flow cache part */
 	struct flow_cache	flow_cache_global;
-	struct kmem_cache	*flow_cachep;
 	atomic_t		flow_cache_genid;
 	struct list_head	flow_cache_gc_list;
 	spinlock_t		flow_cache_gc_lock;
