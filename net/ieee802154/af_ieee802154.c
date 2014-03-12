@@ -329,7 +329,7 @@ drop:
 
 
 static struct packet_type ieee802154_packet_type = {
-	.type = __constant_htons(ETH_P_IEEE802154),
+	.type = htons(ETH_P_IEEE802154),
 	.func = ieee802154_rcv,
 };
 
