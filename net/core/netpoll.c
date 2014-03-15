@@ -544,7 +544,7 @@ static void netpoll_neigh_reply(struct sk_buff *skb, struct netpoll_info *npinfo
 	int hlen, tlen;
 	int hits = 0, proto;
 
-	if (list_empty(&npinfo->rx_np))
+	if (!netpoll_rx_processing(npinfo))
 		return;
 
 	/* Before checking the packet, we do some early
@@ -776,7 +776,7 @@ int __netpoll_rx(struct sk_buff *skb, struct netpoll_info *npinfo)
 	struct netpoll *np, *tmp;
 	uint16_t source;
 
-	if (list_empty(&npinfo->rx_np))
+	if (!netpoll_rx_processing(npinfo))
 		goto out;
 
 	if (skb->dev->type != ARPHRD_ETHER)
