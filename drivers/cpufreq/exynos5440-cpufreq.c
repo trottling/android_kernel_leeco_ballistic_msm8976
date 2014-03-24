@@ -225,7 +225,7 @@ static int exynos_target(struct cpufreq_policy *policy, unsigned int index)
 	freqs.old = dvfs_info->cur_frequency;
 	freqs.new = freq_table[index].frequency;
 
-	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
+	cpufreq_freq_transition_begin(policy, &freqs);
 
 	/* Set the target frequency in all C0_3_PSTATE register */
 	for_each_cpu(i, policy->cpus) {
@@ -265,7 +265,7 @@ static void exynos_cpufreq_work(struct work_struct *work)
 		dev_crit(dvfs_info->dev, "New frequency out of range\n");
 		freqs.new = dvfs_info->cur_frequency;
 	}
-	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
+	cpufreq_freq_transition_end(policy, &freqs, 0);
 
 	cpufreq_cpu_put(policy);
 	mutex_unlock(&cpufreq_lock);
