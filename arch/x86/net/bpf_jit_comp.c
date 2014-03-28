@@ -777,6 +777,7 @@ cond_branch:			f_offset = addrs[i + filter[i].jf] - addrs[i];
 		bpf_flush_icache(header, image + proglen);
 		set_memory_ro((unsigned long)header, header->pages);
 		fp->bpf_func = (void *)image;
+		fp->jited = 1;
 	}
 out:
 	kfree(addrs);
@@ -796,7 +797,7 @@ static void bpf_jit_free_deferred(struct work_struct *work)
 
 void bpf_jit_free(struct sk_filter *fp)
 {
-	if (fp->bpf_func != sk_run_filter) {
+	if (fp->jited) {
 		INIT_WORK(&fp->work, bpf_jit_free_deferred);
 		schedule_work(&fp->work);
 	}
