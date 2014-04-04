@@ -108,7 +108,6 @@ obj-$(CONFIG_SOC_IMX6SL) += pm-imx6q.o headsmp.o
 endif
 
 # i.MX5 based machines
-obj-$(CONFIG_MACH_MX51_BABBAGE) += mach-mx51_babbage.o
 obj-$(CONFIG_MACH_EUKREA_CPUIMX51SD) += mach-cpuimx51sd.o
 obj-$(CONFIG_MACH_EUKREA_MBIMXSD51_BASEBOARD) += eukrea_mbimxsd51-baseboard.o
 
