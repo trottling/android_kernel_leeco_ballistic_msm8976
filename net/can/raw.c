@@ -768,7 +768,7 @@ static int raw_recvmsg(struct kiocb *iocb, struct socket *sock,
 	else
 		size = rxmtu;
 
-	err = memcpy_toiovec(msg->msg_iov, skb->data, size);
+	err = memcpy_to_msg(msg, skb->data, size);
 	if (err < 0) {
 		skb_free_datagram(sk, skb);
 		return err;
