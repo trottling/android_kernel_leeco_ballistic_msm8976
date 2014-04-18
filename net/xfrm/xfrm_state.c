@@ -459,7 +459,7 @@ expired:
 
 	xfrm_audit_state_delete(x, err ? 0 : 1,
 				audit_get_loginuid(current),
-				audit_get_sessionid(current), 0);
+				audit_get_sessionid(current));
 
 out:
 	spin_unlock(&x->lock);
@@ -567,8 +567,7 @@ xfrm_state_flush_secctx_check(struct net *net, u8 proto, struct xfrm_audit *audi
 			   (err = security_xfrm_state_delete(x)) != 0) {
 				xfrm_audit_state_delete(x, 0,
 							audit_info->loginuid,
-							audit_info->sessionid,
-							audit_info->secid);
+							audit_info->sessionid);
 				return err;
 			}
 		}
@@ -606,8 +605,7 @@ restart:
 				err = xfrm_state_delete(x);
 				xfrm_audit_state_delete(x, err ? 0 : 1,
 							audit_info->loginuid,
-							audit_info->sessionid,
-							audit_info->secid);
+							audit_info->sessionid);
 				xfrm_state_put(x);
 				if (!err)
 					cnt++;
@@ -2130,7 +2128,6 @@ void xfrm_state_fini(struct net *net)
 	flush_work(&net->xfrm.state_hash_work);
 	audit_info.loginuid = INVALID_UID;
 	audit_info.sessionid = (unsigned int)-1;
-	audit_info.secid = 0;
 	xfrm_state_flush(net, IPSEC_PROTO_ANY, &audit_info);
 	flush_work(&net->xfrm.state_gc_work);
 
@@ -2195,14 +2192,14 @@ static void xfrm_audit_helper_pktinfo(struct sk_buff *skb, u16 family,
 }
 
 void xfrm_audit_state_add(struct xfrm_state *x, int result,
-			  kuid_t auid, unsigned int sessionid, u32 secid)
+			  kuid_t auid, unsigned int sessionid)
 {
 	struct audit_buffer *audit_buf;
 
 	audit_buf = xfrm_audit_start("SAD-add");
 	if (audit_buf == NULL)
 		return;
-	xfrm_audit_helper_usrinfo(auid, sessionid, secid, audit_buf);
+	xfrm_audit_helper_usrinfo(auid, sessionid, audit_buf);
 	xfrm_audit_helper_sainfo(x, audit_buf);
 	audit_log_format(audit_buf, " res=%u", result);
 	audit_log_end(audit_buf);
@@ -2210,14 +2207,14 @@ void xfrm_audit_state_add(struct xfrm_state *x, int result,
 EXPORT_SYMBOL_GPL(xfrm_audit_state_add);
 
 void xfrm_audit_state_delete(struct xfrm_state *x, int result,
-			     kuid_t auid, unsigned int sessionid, u32 secid)
+			     kuid_t auid, unsigned int sessionid)
 {
 	struct audit_buffer *audit_buf;
 
 	audit_buf = xfrm_audit_start("SAD-delete");
 	if (audit_buf == NULL)
 		return;
-	xfrm_audit_helper_usrinfo(auid, sessionid, secid, audit_buf);
+	xfrm_audit_helper_usrinfo(auid, sessionid, audit_buf);
 	xfrm_audit_helper_sainfo(x, audit_buf);
 	audit_log_format(audit_buf, " res=%u", result);
 	audit_log_end(audit_buf);
