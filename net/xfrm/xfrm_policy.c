@@ -823,8 +823,7 @@ xfrm_policy_flush_secctx_check(struct net *net, u8 type, struct xfrm_audit *audi
 			if (err) {
 				xfrm_audit_policy_delete(pol, 0,
 							 audit_info->loginuid,
-							 audit_info->sessionid,
-							 audit_info->secid);
+							 audit_info->sessionid);
 				return err;
 			}
 		}
@@ -839,8 +838,7 @@ xfrm_policy_flush_secctx_check(struct net *net, u8 type, struct xfrm_audit *audi
 				if (err) {
 					xfrm_audit_policy_delete(pol, 0,
 							audit_info->loginuid,
-							audit_info->sessionid,
-							audit_info->secid);
+							audit_info->sessionid);
 					return err;
 				}
 			}
@@ -880,8 +878,7 @@ int xfrm_policy_flush(struct net *net, u8 type, struct xfrm_audit *audit_info)
 			cnt++;
 
 			xfrm_audit_policy_delete(pol, 1, audit_info->loginuid,
-						 audit_info->sessionid,
-						 audit_info->secid);
+						 audit_info->sessionid);
 
 			xfrm_policy_kill(pol);
 
@@ -902,8 +899,7 @@ int xfrm_policy_flush(struct net *net, u8 type, struct xfrm_audit *audit_info)
 
 				xfrm_audit_policy_delete(pol, 1,
 							 audit_info->loginuid,
-							 audit_info->sessionid,
-							 audit_info->secid);
+							 audit_info->sessionid);
 				xfrm_policy_kill(pol);
 
 				write_lock_bh(&net->xfrm.xfrm_policy_lock);
@@ -2936,12 +2932,10 @@ static void xfrm_policy_fini(struct net *net)
 #ifdef CONFIG_XFRM_SUB_POLICY
 	audit_info.loginuid = INVALID_UID;
 	audit_info.sessionid = (unsigned int)-1;
-	audit_info.secid = 0;
 	xfrm_policy_flush(net, XFRM_POLICY_TYPE_SUB, &audit_info);
 #endif
 	audit_info.loginuid = INVALID_UID;
 	audit_info.sessionid = (unsigned int)-1;
-	audit_info.secid = 0;
 	xfrm_policy_flush(net, XFRM_POLICY_TYPE_MAIN, &audit_info);
 
 	WARN_ON(!list_empty(&net->xfrm.policy_all));
@@ -3058,14 +3052,14 @@ static void xfrm_audit_common_policyinfo(struct xfrm_policy *xp,
 }
 
 void xfrm_audit_policy_add(struct xfrm_policy *xp, int result,
-			   kuid_t auid, unsigned int sessionid, u32 secid)
+			   kuid_t auid, unsigned int sessionid)
 {
 	struct audit_buffer *audit_buf;
 
 	audit_buf = xfrm_audit_start("SPD-add");
 	if (audit_buf == NULL)
 		return;
-	xfrm_audit_helper_usrinfo(auid, sessionid, secid, audit_buf);
+	xfrm_audit_helper_usrinfo(auid, sessionid, audit_buf);
 	audit_log_format(audit_buf, " res=%u", result);
 	xfrm_audit_common_policyinfo(xp, audit_buf);
 	audit_log_end(audit_buf);
@@ -3073,14 +3067,14 @@ void xfrm_audit_policy_add(struct xfrm_policy *xp, int result,
 EXPORT_SYMBOL_GPL(xfrm_audit_policy_add);
 
 void xfrm_audit_policy_delete(struct xfrm_policy *xp, int result,
-			      kuid_t auid, unsigned int sessionid, u32 secid)
+			      kuid_t auid, unsigned int sessionid)
 {
 	struct audit_buffer *audit_buf;
 
 	audit_buf = xfrm_audit_start("SPD-delete");
 	if (audit_buf == NULL)
 		return;
-	xfrm_audit_helper_usrinfo(auid, sessionid, secid, audit_buf);
+	xfrm_audit_helper_usrinfo(auid, sessionid, audit_buf);
 	audit_log_format(audit_buf, " res=%u", result);
 	xfrm_audit_common_policyinfo(xp, audit_buf);
 	audit_log_end(audit_buf);
