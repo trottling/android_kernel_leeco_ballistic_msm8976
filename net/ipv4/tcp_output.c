@@ -1411,12 +1411,13 @@ static void tcp_cwnd_application_limited(struct sock *sk)
 	tp->snd_cwnd_stamp = tcp_time_stamp;
 }
 
-/* Congestion window validation. (RFC2861) */
-static void tcp_cwnd_validate(struct sock *sk)
+static void tcp_cwnd_validate(struct sock *sk, u32 unsent_segs)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 
-	if (tp->packets_out >= tp->snd_cwnd) {
+	tp->lsnd_pending = tp->packets_out + unsent_segs;
+
+	if (tcp_is_cwnd_limited(sk, 0)) {
 		/* Network is feed fully. */
 		tp->snd_cwnd_used = 0;
 		tp->snd_cwnd_stamp = tcp_time_stamp;
@@ -1891,7 +1892,7 @@ static bool tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct sk_buff *skb;
-	unsigned int tso_segs, sent_pkts;
+	unsigned int tso_segs, sent_pkts, unsent_segs = 0;
 	int cwnd_quota;
 	int result;
 
@@ -1935,7 +1936,7 @@ static bool tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 				break;
 		} else {
 			if (!push_one && tcp_tso_should_defer(sk, skb))
-				break;
+				goto compute_unsent_segs;
 		}
 
 		/* TCP Small Queues :
@@ -1958,8 +1959,14 @@ static bool tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 			 * test again the condition.
 			 */
 			smp_mb__after_atomic();
-			if (atomic_read(&sk->sk_wmem_alloc) > limit)
+			if (atomic_read(&sk->sk_wmem_alloc) > limit) {
+				u32 unsent_bytes;
+
+compute_unsent_segs:
+				unsent_bytes = tp->write_seq - tp->snd_nxt;
+				unsent_segs = DIV_ROUND_UP(unsent_bytes, mss_now);
 				break;
+			}
 		}
 
 		limit = mss_now;
@@ -1999,7 +2006,7 @@ repair:
 		/* Send one loss probe per tail loss episode. */
 		if (push_one != 2)
 			tcp_schedule_loss_probe(sk);
-		tcp_cwnd_validate(sk);
+		tcp_cwnd_validate(sk, unsent_segs);
 		return false;
 	}
 	return (push_one == 2) || (!tp->packets_out && tcp_send_head(sk));
