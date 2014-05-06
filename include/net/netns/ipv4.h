@@ -20,6 +20,11 @@ struct local_ports {
 	int		range[2];
 };
 
+struct ping_group_range {
+	seqlock_t	lock;
+	kgid_t		range[2];
+};
+
 struct netns_ipv4 {
 #ifdef CONFIG_SYSCTL
 	struct ctl_table_header	*forw_hdr;
@@ -76,7 +81,7 @@ struct netns_ipv4 {
 	int sysctl_fwmark_reflect;
 	int sysctl_tcp_fwmark_accept;
 
-	kgid_t sysctl_ping_group_range[2];
+	struct ping_group_range ping_group_range;
 
 	atomic_t dev_addr_genid;
 
