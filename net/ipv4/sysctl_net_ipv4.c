@@ -51,10 +51,10 @@ static int tcp_use_userconfig_max = 1;
 /* Update system visible IP port range */
 static void set_local_port_range(struct net *net, int range[2])
 {
-	write_seqlock(&net->ipv4.sysctl_local_ports.lock);
-	net->ipv4.sysctl_local_ports.range[0] = range[0];
-	net->ipv4.sysctl_local_ports.range[1] = range[1];
-	write_sequnlock(&net->ipv4.sysctl_local_ports.lock);
+	write_seqlock(&net->ipv4.ip_local_ports.lock);
+	net->ipv4.ip_local_ports.range[0] = range[0];
+	net->ipv4.ip_local_ports.range[1] = range[1];
+	write_sequnlock(&net->ipv4.ip_local_ports.lock);
 }
 
 /* Validate changes from /proc interface. */
@@ -63,7 +63,7 @@ static int ipv4_local_port_range(struct ctl_table *table, int write,
 				 size_t *lenp, loff_t *ppos)
 {
 	struct net *net =
-		container_of(table->data, struct net, ipv4.sysctl_local_ports.range);
+		container_of(table->data, struct net, ipv4.ip_local_ports.range);
 	int ret;
 	int range[2];
 	struct ctl_table tmp = {
@@ -96,11 +96,11 @@ static void inet_get_ping_group_range_table(struct ctl_table *table, kgid_t *low
 		container_of(table->data, struct net, ipv4.sysctl_ping_group_range);
 	unsigned int seq;
 	do {
-		seq = read_seqbegin(&net->ipv4.sysctl_local_ports.lock);
+		seq = read_seqbegin(&net->ipv4.ip_local_ports.lock);
 
 		*low = data[0];
 		*high = data[1];
-	} while (read_seqretry(&net->ipv4.sysctl_local_ports.lock, seq));
+	} while (read_seqretry(&net->ipv4.ip_local_ports.lock, seq));
 }
 
 /* Update system visible IP port range */
@@ -109,10 +109,10 @@ static void set_ping_group_range(struct ctl_table *table, kgid_t low, kgid_t hig
 	kgid_t *data = table->data;
 	struct net *net =
 		container_of(table->data, struct net, ipv4.sysctl_ping_group_range);
-	write_seqlock(&net->ipv4.sysctl_local_ports.lock);
+	write_seqlock(&net->ipv4.ip_local_ports.lock);
 	data[0] = low;
 	data[1] = high;
-	write_sequnlock(&net->ipv4.sysctl_local_ports.lock);
+	write_sequnlock(&net->ipv4.ip_local_ports.lock);
 }
 
 /* Validate changes from /proc interface. */
@@ -905,8 +905,8 @@ static struct ctl_table ipv4_net_table[] = {
 	},
 	{
 		.procname	= "ip_local_port_range",
-		.maxlen		= sizeof(init_net.ipv4.sysctl_local_ports.range),
-		.data		= &init_net.ipv4.sysctl_local_ports.range,
+		.maxlen		= sizeof(init_net.ipv4.ip_local_ports.range),
+		.data		= &init_net.ipv4.ip_local_ports.range,
 		.mode		= 0644,
 		.proc_handler	= ipv4_local_port_range,
 	},
@@ -981,13 +981,6 @@ static __net_init int ipv4_sysctl_init_net(struct net *net)
 	 */
 	net->ipv4.sysctl_ping_group_range[0] = make_kgid(&init_user_ns, 1);
 	net->ipv4.sysctl_ping_group_range[1] = make_kgid(&init_user_ns, 0);
-
-	/*
-	 * Set defaults for local port range
-	 */
-	seqlock_init(&net->ipv4.sysctl_local_ports.lock);
-	net->ipv4.sysctl_local_ports.range[0] =  32768;
-	net->ipv4.sysctl_local_ports.range[1] =  61000;
 
 	net->ipv4.ipv4_hdr = register_net_sysctl(net, "net/ipv4", table);
 	if (net->ipv4.ipv4_hdr == NULL)
