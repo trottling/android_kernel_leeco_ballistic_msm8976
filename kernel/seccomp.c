@@ -413,10 +413,8 @@ static struct seccomp_filter *seccomp_prepare_filter(struct sock_fprog *fprog)
 
 	atomic_set(&filter->usage, 1);
 	filter->prog->len = new_len;
-	filter->prog->bpf_func = (void *)sk_run_filter_int_seccomp;
 
-	/* JIT internal BPF into native HW instructions */
-	bpf_int_jit_compile(filter->prog);
+	sk_filter_select_runtime(filter->prog);
 
 	return filter;
 
