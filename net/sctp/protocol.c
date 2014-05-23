@@ -1018,7 +1018,6 @@ static struct inet_protosw sctp_seqpacket_protosw = {
 	.protocol   = IPPROTO_SCTP,
 	.prot       = &sctp_prot,
 	.ops        = &inet_seqpacket_ops,
-	.no_check   = 0,
 	.flags      = SCTP_PROTOSW_FLAG
 };
 static struct inet_protosw sctp_stream_protosw = {
@@ -1026,7 +1025,6 @@ static struct inet_protosw sctp_stream_protosw = {
 	.protocol   = IPPROTO_SCTP,
 	.prot       = &sctp_prot,
 	.ops        = &inet_seqpacket_ops,
-	.no_check   = 0,
 	.flags      = SCTP_PROTOSW_FLAG
 };
 
