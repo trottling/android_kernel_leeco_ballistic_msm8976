@@ -6,7 +6,6 @@ config ARCH_TEGRA
 	select CLKSRC_MMIO
 	select HAVE_ARM_SCU if SMP
 	select HAVE_ARM_TWD if SMP
-	select MIGHT_HAVE_PCI
 	select PINCTRL
 	select SOC_BUS
 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
