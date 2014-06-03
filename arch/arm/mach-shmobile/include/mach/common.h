@@ -38,6 +38,12 @@ int shmobile_cpuidle_init(void);
 static inline int shmobile_cpuidle_init(void) { return 0; }
 #endif
 
+#ifdef CONFIG_CPU_FREQ
+int shmobile_cpufreq_init(void);
+#else
+static inline int shmobile_cpufreq_init(void) { return 0; }
+#endif
+
 extern void __iomem *shmobile_scu_base;
 extern void shmobile_smp_init_cpus(unsigned int ncores);
 
@@ -45,6 +51,7 @@ static inline void __init shmobile_init_late(void)
 {
 	shmobile_suspend_init();
 	shmobile_cpuidle_init();
+	shmobile_cpufreq_init();
 }
 
 #endif /* __ARCH_MACH_COMMON_H */
