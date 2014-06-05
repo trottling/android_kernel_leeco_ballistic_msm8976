@@ -45,6 +45,7 @@ static struct sk_buff *udp6_ufo_fragment(struct sk_buff *skb,
 		if (unlikely(type & ~(SKB_GSO_UDP |
 				      SKB_GSO_DODGY |
 				      SKB_GSO_UDP_TUNNEL |
+				      SKB_GSO_UDP_TUNNEL_CSUM |
 				      SKB_GSO_GRE |
 				      SKB_GSO_IPIP |
 				      SKB_GSO_SIT |
@@ -58,7 +59,8 @@ static struct sk_buff *udp6_ufo_fragment(struct sk_buff *skb,
 		goto out;
 	}
 
-	if (skb->encapsulation && skb_shinfo(skb)->gso_type & SKB_GSO_UDP_TUNNEL)
+	if (skb->encapsulation && skb_shinfo(skb)->gso_type &
+	    (SKB_GSO_UDP_TUNNEL|SKB_GSO_UDP_TUNNEL_CSUM))
 		segs = skb_udp_tunnel_segment(skb, features);
 	else {
 		const struct ipv6hdr *ipv6h;
