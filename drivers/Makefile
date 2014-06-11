@@ -162,6 +162,7 @@ obj-$(CONFIG_ANDROID)		+= android/
 obj-$(CONFIG_FMC)		+= fmc/
 obj-$(CONFIG_POWERCAP)		+= powercap/
 obj-$(CONFIG_MCB)		+= mcb/
+obj-$(CONFIG_RAS)		+= ras/
 
 obj-$(CONFIG_CORESIGHT)		+= coresight/
 obj-$(CONFIG_ESOC)		+= esoc/
