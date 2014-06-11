@@ -404,7 +404,7 @@ static void snd_timer_notify1(struct snd_timer_instance *ti, int event)
 	struct timespec tstamp;
 
 	if (timer_tstamp_monotonic)
-		do_posix_clock_monotonic_gettime(&tstamp);
+		ktime_get_ts(&tstamp);
 	else
 		getnstimeofday(&tstamp);
 	if (snd_BUG_ON(event < SNDRV_TIMER_EVENT_START ||
@@ -1249,7 +1249,7 @@ static void snd_timer_user_tinterrupt(struct snd_timer_instance *timeri,
 	}
 	if (tu->last_resolution != resolution || ticks > 0) {
 		if (timer_tstamp_monotonic)
-			do_posix_clock_monotonic_gettime(&tstamp);
+			ktime_get_ts(&tstamp);
 		else
 			getnstimeofday(&tstamp);
 	}
