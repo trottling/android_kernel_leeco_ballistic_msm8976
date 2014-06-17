@@ -25,6 +25,7 @@
 #include <mach/r7s72100.h>
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
+#include "clock.h"
 
 static void __init genmai_add_standard_devices(void)
 {
