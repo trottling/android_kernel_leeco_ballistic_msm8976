@@ -109,6 +109,34 @@ static const u32 imx6q_mmdc_io_offset[] __initconst = {
 	0x74c,			    /* GPR_ADDS */
 };
 
+static const u32 imx6dl_mmdc_io_offset[] __initconst = {
+	0x470, 0x474, 0x478, 0x47c, /* DQM0 ~ DQM3 */
+	0x480, 0x484, 0x488, 0x48c, /* DQM4 ~ DQM7 */
+	0x464, 0x490, 0x4ac, 0x4b0, /* CAS, RAS, SDCLK_0, SDCLK_1 */
+	0x4bc, 0x4c0, 0x4c4, 0x4c8, /* DRAM_SDQS0 ~ DRAM_SDQS3 */
+	0x4cc, 0x4d0, 0x4d4, 0x4d8, /* DRAM_SDQS4 ~ DRAM_SDQS7 */
+	0x764, 0x770, 0x778, 0x77c, /* GPR_B0DS ~ GPR_B3DS */
+	0x780, 0x784, 0x78c, 0x748, /* GPR_B4DS ~ GPR_B7DS */
+	0x4b4, 0x4b8, 0x750, 0x760, /* SODT0, SODT1, MODE_CTL, MODE */
+	0x74c,			    /* GPR_ADDS */
+};
+
+static const u32 imx6sl_mmdc_io_offset[] __initconst = {
+	0x30c, 0x310, 0x314, 0x318, /* DQM0 ~ DQM3 */
+	0x5c4, 0x5cc, 0x5d4, 0x5d8, /* GPR_B0DS ~ GPR_B3DS */
+	0x300, 0x31c, 0x338, 0x5ac, /* CAS, RAS, SDCLK_0, GPR_ADDS */
+	0x33c, 0x340, 0x5b0, 0x5c0, /* SODT0, SODT1, MODE_CTL, MODE */
+	0x330, 0x334, 0x320,        /* SDCKE0, SDCKE1, RESET */
+};
+
+static const u32 imx6sx_mmdc_io_offset[] __initconst = {
+	0x2ec, 0x2f0, 0x2f4, 0x2f8, /* DQM0 ~ DQM3 */
+	0x60c, 0x610, 0x61c, 0x620, /* GPR_B0DS ~ GPR_B3DS */
+	0x300, 0x2fc, 0x32c, 0x5f4, /* CAS, RAS, SDCLK_0, GPR_ADDS */
+	0x310, 0x314, 0x5f8, 0x608, /* SODT0, SODT1, MODE_CTL, MODE */
+	0x330, 0x334, 0x338, 0x33c, /* SDQS0 ~ SDQS3 */
+};
+
 static const struct imx6_pm_socdata imx6q_pm_data __initconst = {
 	.cpu_type = MXC_CPU_IMX6Q,
 	.mmdc_compat = "fsl,imx6q-mmdc",
@@ -117,6 +145,36 @@ static const struct imx6_pm_socdata imx6q_pm_data __initconst = {
 	.gpc_compat = "fsl,imx6q-gpc",
 	.mmdc_io_num = ARRAY_SIZE(imx6q_mmdc_io_offset),
 	.mmdc_io_offset = imx6q_mmdc_io_offset,
+};
+
+static const struct imx6_pm_socdata imx6dl_pm_data __initconst = {
+	.cpu_type = MXC_CPU_IMX6DL,
+	.mmdc_compat = "fsl,imx6q-mmdc",
+	.src_compat = "fsl,imx6q-src",
+	.iomuxc_compat = "fsl,imx6dl-iomuxc",
+	.gpc_compat = "fsl,imx6q-gpc",
+	.mmdc_io_num = ARRAY_SIZE(imx6dl_mmdc_io_offset),
+	.mmdc_io_offset = imx6dl_mmdc_io_offset,
+};
+
+static const struct imx6_pm_socdata imx6sl_pm_data __initconst = {
+	.cpu_type = MXC_CPU_IMX6SL,
+	.mmdc_compat = "fsl,imx6sl-mmdc",
+	.src_compat = "fsl,imx6sl-src",
+	.iomuxc_compat = "fsl,imx6sl-iomuxc",
+	.gpc_compat = "fsl,imx6sl-gpc",
+	.mmdc_io_num = ARRAY_SIZE(imx6sl_mmdc_io_offset),
+	.mmdc_io_offset = imx6sl_mmdc_io_offset,
+};
+
+static const struct imx6_pm_socdata imx6sx_pm_data __initconst = {
+	.cpu_type = MXC_CPU_IMX6SX,
+	.mmdc_compat = "fsl,imx6sx-mmdc",
+	.src_compat = "fsl,imx6sx-src",
+	.iomuxc_compat = "fsl,imx6sx-iomuxc",
+	.gpc_compat = "fsl,imx6sx-gpc",
+	.mmdc_io_num = ARRAY_SIZE(imx6sx_mmdc_io_offset),
+	.mmdc_io_offset = imx6sx_mmdc_io_offset,
 };
 
 /*
@@ -201,7 +259,7 @@ static void imx6q_enable_wb(bool enable)
 
 int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
 {
-	struct irq_desc *iomuxc_irq_desc;
+	struct irq_data *iomuxc_irq_data = irq_get_irq_data(32);
 	u32 val = readl_relaxed(ccm_base + CLPCR);
 
 	val &= ~BM_CLPCR_LPM;
@@ -225,12 +283,12 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
 		val |= 0x3 << BP_CLPCR_STBY_COUNT;
 		val |= BM_CLPCR_VSTBY;
 		val |= BM_CLPCR_SBYOS;
-		if (cpu_is_imx6sl()) {
+		if (cpu_is_imx6sl())
 			val |= BM_CLPCR_BYPASS_PMIC_READY;
+		if (cpu_is_imx6sl() || cpu_is_imx6sx())
 			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
-		} else {
+		else
 			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
-		}
 		break;
 	default:
 		return -EINVAL;
@@ -248,10 +306,9 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
 	 * 3) Software should mask IRQ #32 right after CCM Low-Power mode
 	 *    is set (set bits 0-1 of CCM_CLPCR).
 	 */
-	iomuxc_irq_desc = irq_to_desc(32);
-	imx_gpc_irq_unmask(&iomuxc_irq_desc->irq_data);
+	imx_gpc_irq_unmask(iomuxc_irq_data);
 	writel_relaxed(val, ccm_base + CLPCR);
-	imx_gpc_irq_mask(&iomuxc_irq_desc->irq_data);
+	imx_gpc_irq_mask(iomuxc_irq_data);
 
 	return 0;
 }
@@ -342,8 +399,7 @@ out:
 	return ret;
 }
 
-static int __init imx6q_ocram_suspend_init(const struct imx6_pm_socdata
-					*socdata)
+static int __init imx6q_suspend_init(const struct imx6_pm_socdata *socdata)
 {
 	phys_addr_t ocram_pbase;
 	struct device_node *node;
@@ -353,6 +409,8 @@ static int __init imx6q_ocram_suspend_init(const struct imx6_pm_socdata
 	unsigned long ocram_base;
 	int i, ret = 0;
 	const u32 *mmdc_offset_array;
+
+	suspend_set_ops(&imx6q_pm_ops);
 
 	if (!socdata) {
 		pr_warn("%s: invalid argument!\n", __func__);
@@ -475,10 +533,12 @@ static void __init imx6_pm_common_init(const struct imx6_pm_socdata
 
 	WARN_ON(!ccm_base);
 
-	ret = imx6q_ocram_suspend_init(socdata);
-	if (ret)
-		pr_warn("%s: failed to initialize ocram suspend %d!\n",
-			__func__, ret);
+	if (IS_ENABLED(CONFIG_SUSPEND)) {
+		ret = imx6q_suspend_init(socdata);
+		if (ret)
+			pr_warn("%s: No DDR LPM support with suspend %d!\n",
+				__func__, ret);
+	}
 
 	/*
 	 * This is for SW workaround step #1 of ERR007265, see comments
@@ -491,9 +551,6 @@ static void __init imx6_pm_common_init(const struct imx6_pm_socdata
 	if (!IS_ERR(gpr))
 		regmap_update_bits(gpr, IOMUXC_GPR1, IMX6Q_GPR1_GINT,
 				   IMX6Q_GPR1_GINT);
-
-
-	suspend_set_ops(&imx6q_pm_ops);
 }
 
 void __init imx6q_pm_init(void)
@@ -503,10 +560,15 @@ void __init imx6q_pm_init(void)
 
 void __init imx6dl_pm_init(void)
 {
-	imx6_pm_common_init(NULL);
+	imx6_pm_common_init(&imx6dl_pm_data);
 }
 
 void __init imx6sl_pm_init(void)
 {
-	imx6_pm_common_init(NULL);
+	imx6_pm_common_init(&imx6sl_pm_data);
+}
+
+void __init imx6sx_pm_init(void)
+{
+	imx6_pm_common_init(&imx6sx_pm_data);
 }
