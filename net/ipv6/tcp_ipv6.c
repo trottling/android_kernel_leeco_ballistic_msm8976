@@ -506,6 +506,8 @@ static int tcp_v6_send_synack(struct sock *sk, struct dst_entry *dst,
 			       np->tclass);
 		rcu_read_unlock();
 		err = net_xmit_eval(err);
+		if (!tcp_rsk(req)->snt_synack && !err)
+			tcp_rsk(req)->snt_synack = tcp_time_stamp;
 	}
 
 done:
@@ -1123,7 +1125,6 @@ have_isn:
 		goto drop_and_free;
 
 	tcp_rsk(req)->snt_isn = isn;
-	tcp_rsk(req)->snt_synack = tcp_time_stamp;
 	tcp_openreq_init_rwin(req, sk, dst);
 	fastopen = !want_cookie &&
 		   tcp_try_fastopen(sk, skb, req, &foc, dst);
