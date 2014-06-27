@@ -222,7 +222,7 @@ lookup_protocol:
 	np->mcast_hops	= IPV6_DEFAULT_MCASTHOPS;
 	np->mc_loop	= 1;
 	np->pmtudisc	= IPV6_PMTUDISC_WANT;
-	np->ipv6only	= net->ipv6.sysctl.bindv6only;
+	sk->sk_ipv6only	= net->ipv6.sysctl.bindv6only;
 
 	/* Init the ipv4 part of the socket since we can have sockets
 	 * using v6 API for ipv4.
@@ -319,7 +319,7 @@ int inet6_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		/* Binding to v4-mapped address on a v6-only socket
 		 * makes no sense
 		 */
-		if (np->ipv6only) {
+		if (sk->sk_ipv6only) {
 			err = -EINVAL;
 			goto out;
 		}
@@ -396,7 +396,7 @@ int inet6_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	if (addr_type != IPV6_ADDR_ANY) {
 		sk->sk_userlocks |= SOCK_BINDADDR_LOCK;
 		if (addr_type != IPV6_ADDR_MAPPED)
-			np->ipv6only = 1;
+			sk->sk_ipv6only = 1;
 	}
 	if (snum)
 		sk->sk_userlocks |= SOCK_BINDPORT_LOCK;
