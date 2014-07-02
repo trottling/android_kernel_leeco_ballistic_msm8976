@@ -200,6 +200,8 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 	sk->sk_v6_daddr = usin->sin6_addr;
 	np->flow_label = fl6.flowlabel;
 
+	ip6_set_txhash(sk);
+
 	/*
 	 *	TCP over IPv4
 	 */
@@ -1232,6 +1234,8 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 	newnp->saddr = treq->loc_addr;
 	newsk->sk_v6_rcv_saddr = treq->loc_addr;
 	newsk->sk_bound_dev_if = treq->iif;
+
+	ip6_set_txhash(newsk);
 
 	/* Now IPv6 options...
 
