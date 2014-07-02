@@ -118,6 +118,7 @@ static void
 mac802154_del_iface(struct wpan_phy *phy, struct net_device *dev)
 {
 	struct mac802154_sub_if_data *sdata;
+
 	ASSERT_RTNL();
 
 	sdata = netdev_priv(dev);
@@ -255,7 +256,8 @@ ieee802154_alloc_device(size_t priv_data_len, struct ieee802154_ops *ops)
 	}
 
 	priv = wpan_phy_priv(phy);
-	priv->hw.phy = priv->phy = phy;
+	priv->phy = phy;
+	priv->hw.phy = priv->phy;
 	priv->hw.priv = (char *)priv + ALIGN(sizeof(*priv), NETDEV_ALIGN);
 	priv->ops = ops;
 
