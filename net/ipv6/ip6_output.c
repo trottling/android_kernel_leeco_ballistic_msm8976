@@ -769,8 +769,8 @@ slow_path:
 		/*
 		 *	Copy a block of the IP datagram.
 		 */
-		if (skb_copy_bits(skb, ptr, skb_transport_header(frag), len))
-			BUG();
+		BUG_ON(skb_copy_bits(skb, ptr, skb_transport_header(frag),
+				     len));
 		left -= len;
 
 		fh->frag_off = htons(offset);
