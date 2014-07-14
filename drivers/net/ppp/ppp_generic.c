@@ -2667,7 +2667,8 @@ ppp_create_interface(struct net *net, int unit, int *retp)
 	int ret = -ENOMEM;
 	int i;
 
-	dev = alloc_netdev(sizeof(struct ppp), "", ppp_setup);
+	dev = alloc_netdev(sizeof(struct ppp), "", NET_NAME_UNKNOWN,
+			   ppp_setup);
 	if (!dev)
 		goto out1;
 

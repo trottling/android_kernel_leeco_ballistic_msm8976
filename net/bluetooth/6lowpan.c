@@ -759,7 +759,8 @@ int bt_6lowpan_add_conn(struct l2cap_conn *conn)
 	if (dev)
 		return add_peer_conn(conn, dev);
 
-	netdev = alloc_netdev(sizeof(*dev), IFACE_NAME_TEMPLATE, netdev_setup);
+	netdev = alloc_netdev(sizeof(struct lowpan_dev), IFACE_NAME_TEMPLATE,
+			      NET_NAME_UNKNOWN, netdev_setup);
 	if (!netdev)
 		return -ENOMEM;
 

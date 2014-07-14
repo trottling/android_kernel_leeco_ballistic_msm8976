@@ -771,7 +771,7 @@ int wlan_setup(wlandevice_t *wlandev, struct device *physdev)
 
 	/* Allocate and initialize the struct device */
 	netdev = alloc_netdev(sizeof(struct wireless_dev), "wlan%d",
-				ether_setup);
+			      NET_NAME_UNKNOWN, ether_setup);
 	if (netdev == NULL) {
 		printk(KERN_ERR "Failed to alloc netdev.\n");
 		wlan_free_wiphy(wiphy);

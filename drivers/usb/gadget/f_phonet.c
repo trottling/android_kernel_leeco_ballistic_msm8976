@@ -613,7 +613,8 @@ int __init gphonet_setup(struct usb_gadget *gadget)
 
 	/* Create net device */
 	BUG_ON(dev);
-	dev = alloc_netdev(sizeof(*port), "upnlink%d", pn_net_setup);
+	dev = alloc_netdev(sizeof(*port), "upnlink%d", NET_NAME_UNKNOWN,
+			   pn_net_setup);
 	if (!dev)
 		return -ENOMEM;
 

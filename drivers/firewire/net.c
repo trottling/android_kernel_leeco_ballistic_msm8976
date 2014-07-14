@@ -1479,7 +1479,8 @@ static int fwnet_probe(struct fw_unit *unit,
 		goto have_dev;
 	}
 
-	net = alloc_netdev(sizeof(*dev), "firewire%d", fwnet_init_dev);
+	net = alloc_netdev(sizeof(*dev), "firewire%d", NET_NAME_UNKNOWN,
+			   fwnet_init_dev);
 	if (net == NULL) {
 		ret = -ENOMEM;
 		goto out;

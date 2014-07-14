@@ -287,7 +287,8 @@ static int l2tp_eth_create(struct net *net, struct l2tp_tunnel *tunnel,
 		goto out;
 	}
 
-	dev = alloc_netdev(sizeof(*priv), name, l2tp_eth_dev_setup);
+	dev = alloc_netdev(sizeof(*priv), name, NET_NAME_UNKNOWN,
+			   l2tp_eth_dev_setup);
 	if (!dev) {
 		rc = -ENOMEM;
 		goto out_del_session;

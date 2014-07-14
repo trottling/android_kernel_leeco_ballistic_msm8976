@@ -2021,6 +2021,7 @@ static int ipa_wwan_probe(struct platform_device *pdev)
 	/* initialize wan-driver netdev */
 	dev = alloc_netdev(sizeof(struct wwan_private),
 			   IPA_WWAN_DEV_NAME,
+			   NET_NAME_UNKNOWN,
 			   ipa_wwan_setup);
 	if (!dev) {
 		IPAWANERR("no memory for netdev\n");
