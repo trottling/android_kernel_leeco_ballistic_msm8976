@@ -363,6 +363,8 @@ static int raw_send_hdrinc(struct sock *sk, struct flowi4 *fl4,
 
 	skb->ip_summed = CHECKSUM_NONE;
 
+	sock_tx_timestamp(sk, &skb_shinfo(skb)->tx_flags);
+
 	skb->transport_header = skb->network_header;
 	err = -EFAULT;
 	if (memcpy_fromiovecend((void *)iph, from, 0, length))
@@ -604,6 +606,8 @@ back_from_confirm:
 				      &rt, msg->msg_flags);
 
 	 else {
+		sock_tx_timestamp(sk, &ipc.tx_flags);
+
 		if (!ipc.addr)
 			ipc.addr = fl4.daddr;
 		lock_sock(sk);
