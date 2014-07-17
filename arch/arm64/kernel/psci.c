@@ -489,6 +489,7 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
 	return 0;
 }
 #endif
+#endif
 
 static int psci_suspend_finisher(unsigned long state_id)
 {
@@ -514,6 +515,7 @@ static int cpu_psci_cpu_suspend(unsigned long state_id)
 
 const struct cpu_operations cpu_psci_ops = {
 	.name		= "psci",
+#ifdef CONFIG_SMP
 	.cpu_init	= cpu_psci_cpu_init,
 #ifdef CONFIG_ARM64_CPU_SUSPEND
 	.cpu_suspend	= cpu_psci_cpu_suspend,
@@ -525,6 +527,6 @@ const struct cpu_operations cpu_psci_ops = {
 	.cpu_die	= cpu_psci_cpu_die,
 	.cpu_kill	= cpu_psci_cpu_kill,
 #endif
+#endif
 };
 
-#endif
