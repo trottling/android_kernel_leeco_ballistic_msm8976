@@ -199,13 +199,19 @@ int mipi_dsi_detach(struct mipi_dsi_device *dsi)
 EXPORT_SYMBOL(mipi_dsi_detach);
 
 /**
- * mipi_dsi_dcs_write - send DCS write command
- * @dsi: DSI device
- * @data: pointer to the command followed by parameters
- * @len: length of @data
+ * mipi_dsi_dcs_write_buffer() - transmit a DCS command with payload
+ * @dsi: DSI peripheral device
+ * @data: buffer containing data to be transmitted
+ * @len: size of transmission buffer
+ *
+ * This function will automatically choose the right data type depending on
+ * the command payload length.
+ *
+ * Return: The number of bytes successfully transmitted or a negative error
+ * code on failure.
  */
-ssize_t mipi_dsi_dcs_write(struct mipi_dsi_device *dsi, const void *data,
-			    size_t len)
+ssize_t mipi_dsi_dcs_write_buffer(struct mipi_dsi_device *dsi,
+				  const void *data, size_t len)
 {
 	const struct mipi_dsi_host_ops *ops = dsi->host->ops;
 	struct mipi_dsi_msg msg = {
@@ -220,12 +226,15 @@ ssize_t mipi_dsi_dcs_write(struct mipi_dsi_device *dsi, const void *data,
 	switch (len) {
 	case 0:
 		return -EINVAL;
+
 	case 1:
 		msg.type = MIPI_DSI_DCS_SHORT_WRITE;
 		break;
+
 	case 2:
 		msg.type = MIPI_DSI_DCS_SHORT_WRITE_PARAM;
 		break;
+
 	default:
 		msg.type = MIPI_DSI_DCS_LONG_WRITE;
 		break;
@@ -233,16 +242,60 @@ ssize_t mipi_dsi_dcs_write(struct mipi_dsi_device *dsi, const void *data,
 
 	return ops->transfer(dsi->host, &msg);
 }
+EXPORT_SYMBOL(mipi_dsi_dcs_write_buffer);
+
+/**
+ * mipi_dsi_dcs_write() - send DCS write command
+ * @dsi: DSI peripheral device
+ * @cmd: DCS command
+ * @data: buffer containing the command payload
+ * @len: command payload length
+ *
+ * This function will automatically choose the right data type depending on
+ * the command payload length.
+ *
+ * Return: The number of bytes successfully transmitted or a negative error
+ * code on failure.
+ */
+ssize_t mipi_dsi_dcs_write(struct mipi_dsi_device *dsi, u8 cmd,
+			   const void *data, size_t len)
+{
+	ssize_t err;
+	size_t size;
+	u8 *tx;
+
+	if (len > 0) {
+		size = 1 + len;
+
+		tx = kmalloc(size, GFP_KERNEL);
+		if (!tx)
+			return -ENOMEM;
+
+		/* concatenate the DCS command byte and the payload */
+		tx[0] = cmd;
+		memcpy(&tx[1], data, len);
+	} else {
+		tx = &cmd;
+		size = 1;
+	}
+
+	err = mipi_dsi_dcs_write_buffer(dsi, tx, size);
+
+	if (len > 0)
+		kfree(tx);
+
+	return err;
+}
 EXPORT_SYMBOL(mipi_dsi_dcs_write);
 
 /**
- * mipi_dsi_dcs_read - send DCS read request command
- * @dsi: DSI device
- * @cmd: DCS read command
- * @data: pointer to read buffer
- * @len: length of @data
+ * mipi_dsi_dcs_read() - send DCS read request command
+ * @dsi: DSI peripheral device
+ * @cmd: DCS command
+ * @data: buffer in which to receive data
+ * @len: size of receive buffer
  *
- * Function returns number of read bytes or error code.
+ * Return: The number of bytes read or a negative error code on failure.
  */
 ssize_t mipi_dsi_dcs_read(struct mipi_dsi_device *dsi, u8 cmd, void *data,
 			  size_t len)
