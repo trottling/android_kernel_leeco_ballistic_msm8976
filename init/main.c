@@ -585,6 +585,7 @@ asmlinkage void __init start_kernel(void)
 	early_irq_init();
 	init_IRQ();
 	tick_init();
+	rcu_init_nohz();
 	init_timers();
 	hrtimers_init();
 	softirq_init();
