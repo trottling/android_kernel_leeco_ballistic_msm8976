@@ -1255,7 +1255,6 @@ emsgsize:
 		}
 	}
 
-	/* For UDP, check if TX timestamp is enabled */
 	if (sk->sk_type == SOCK_DGRAM || sk->sk_type == SOCK_RAW)
 		sock_tx_timestamp(sk, &tx_flags);
 
