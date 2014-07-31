@@ -862,41 +862,30 @@ static void sk_filter_release(struct sk_filter *fp)
 
 void sk_filter_uncharge(struct sock *sk, struct sk_filter *fp)
 {
-	atomic_sub(sk_filter_size(fp->len), &sk->sk_omem_alloc);
+	u32 filter_size = sk_filter_size(fp->len);
+
+	atomic_sub(filter_size, &sk->sk_omem_alloc);
 	sk_filter_release(fp);
 }
 
-void sk_filter_charge(struct sock *sk, struct sk_filter *fp)
+/* try to charge the socket memory if there is space available
+ * return true on success
+ */
+bool sk_filter_charge(struct sock *sk, struct sk_filter *fp)
 {
-	atomic_inc(&fp->refcnt);
-	atomic_add(sk_filter_size(fp->len), &sk->sk_omem_alloc);
-}
+	u32 filter_size = sk_filter_size(fp->len);
 
-static struct sk_filter *__sk_migrate_realloc(struct sk_filter *fp,
-					      struct sock *sk,
-					      unsigned int len)
-{
-	struct sk_filter *fp_new;
-
-	if (sk == NULL)
-		return krealloc(fp, len, GFP_KERNEL);
-
-	fp_new = sock_kmalloc(sk, len, GFP_KERNEL);
-	if (fp_new) {
-		*fp_new = *fp;
-		/* As we're keeping orig_prog in fp_new along,
-		 * we need to make sure we're not evicting it
-		 * from the old fp.
-		 */
-		fp->orig_prog = NULL;
-		sk_filter_uncharge(sk, fp);
+	/* same check as in sock_kmalloc() */
+	if (filter_size <= sysctl_optmem_max &&
+	    atomic_read(&sk->sk_omem_alloc) + filter_size < sysctl_optmem_max) {
+		atomic_inc(&fp->refcnt);
+		atomic_add(filter_size, &sk->sk_omem_alloc);
+		return true;
 	}
-
-	return fp_new;
+	return false;
 }
 
-static struct sk_filter *__sk_migrate_filter(struct sk_filter *fp,
-					     struct sock *sk)
+static struct sk_filter *__sk_migrate_filter(struct sk_filter *fp)
 {
 	struct sock_filter *old_prog;
 	struct sk_filter *old_fp;
@@ -928,7 +917,7 @@ static struct sk_filter *__sk_migrate_filter(struct sk_filter *fp,
 
 	/* Expand fp for appending the new filter representation. */
 	old_fp = fp;
-	fp = __sk_migrate_realloc(old_fp, sk, sk_filter_size(new_len));
+	fp = krealloc(old_fp, sk_filter_size(new_len), GFP_KERNEL);
 	if (!fp) {
 		/* The old_fp is still around in case we couldn't
 		 * allocate new memory, so uncharge on that one.
@@ -946,7 +935,7 @@ static struct sk_filter *__sk_migrate_filter(struct sk_filter *fp,
 		/* 2nd bpf_convert_filter() can fail only if it fails
 		 * to allocate memory, remapping must succeed. Note,
 		 * that at this time old_fp has already been released
-		 * by __sk_migrate_realloc().
+		 * by krealloc().
 		 */
 		goto out_err_free;
 
@@ -958,16 +947,11 @@ static struct sk_filter *__sk_migrate_filter(struct sk_filter *fp,
 out_err_free:
 	kfree(old_prog);
 out_err:
-	/* Rollback filter setup. */
-	if (sk != NULL)
-		sk_filter_uncharge(sk, fp);
-	else
-		kfree(fp);
+	__sk_filter_release(fp);
 	return ERR_PTR(err);
 }
 
-static struct sk_filter *__sk_prepare_filter(struct sk_filter *fp,
-					     struct sock *sk)
+static struct sk_filter *__sk_prepare_filter(struct sk_filter *fp)
 {
 	int err;
 
@@ -976,10 +960,7 @@ static struct sk_filter *__sk_prepare_filter(struct sk_filter *fp,
 
 	err = bpf_check_classic(fp->insns, fp->len);
 	if (err) {
-		if (sk != NULL)
-			sk_filter_uncharge(sk, fp);
-		else
-			kfree(fp);
+		__sk_filter_release(fp);
 		return ERR_PTR(err);
 	}
 
@@ -992,7 +973,7 @@ static struct sk_filter *__sk_prepare_filter(struct sk_filter *fp,
 	 * internal BPF translation for the optimized interpreter.
 	 */
 	if (!fp->jited)
-		fp = __sk_migrate_filter(fp, sk);
+		fp = __sk_migrate_filter(fp);
 
 	return fp;
 }
@@ -1031,10 +1012,10 @@ int sk_unattached_filter_create(struct sk_filter **pfp,
 	 */
 	fp->orig_prog = NULL;
 
-	/* __sk_prepare_filter() already takes care of uncharging
+	/* __sk_prepare_filter() already takes care of freeing
 	 * memory in case something goes wrong.
 	 */
-	fp = __sk_prepare_filter(fp, NULL);
+	fp = __sk_prepare_filter(fp);
 	if (IS_ERR(fp))
 		return PTR_ERR(fp);
 
@@ -1073,30 +1054,36 @@ int sk_attach_filter(struct sock_fprog *fprog, struct sock *sk)
 	if (fprog->filter == NULL)
 		return -EINVAL;
 
-	fp = sock_kmalloc(sk, sk_fsize, GFP_KERNEL);
+	fp = kmalloc(sk_fsize, GFP_KERNEL);
 	if (!fp)
 		return -ENOMEM;
 
 	if (copy_from_user(fp->insns, fprog->filter, fsize)) {
-		sock_kfree_s(sk, fp, sk_fsize);
+		kfree(fp);
 		return -EFAULT;
 	}
 
-	atomic_set(&fp->refcnt, 1);
 	fp->len = fprog->len;
 
 	err = sk_store_orig_filter(fp, fprog);
 	if (err) {
-		sk_filter_uncharge(sk, fp);
+		kfree(fp);
 		return -ENOMEM;
 	}
 
-	/* __sk_prepare_filter() already takes care of uncharging
+	/* __sk_prepare_filter() already takes care of freeing
 	 * memory in case something goes wrong.
 	 */
-	fp = __sk_prepare_filter(fp, sk);
+	fp = __sk_prepare_filter(fp);
 	if (IS_ERR(fp))
 		return PTR_ERR(fp);
+
+	atomic_set(&fp->refcnt, 0);
+
+	if (!sk_filter_charge(sk, fp)) {
+		__sk_filter_release(fp);
+		return -ENOMEM;
+	}
 
 	old_fp = rcu_dereference_protected(sk->sk_filter,
 					   sock_owned_by_user(sk));
