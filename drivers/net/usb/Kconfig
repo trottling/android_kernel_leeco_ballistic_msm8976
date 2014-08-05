@@ -1,11 +1,15 @@
 #
 # USB Network devices configuration
 #
-comment "Networking support is needed for USB Network Adapter support"
-	depends on USB && !NET
+comment "Host-side USB support is needed for USB Network Adapter support"
+	depends on !USB && NET
 
-menu "USB Network Adapters"
+menuconfig USB_NET_DRIVERS
+	bool "USB Network Adapters"
+	default y
 	depends on USB && NET
+
+if USB_NET_DRIVERS
 
 config USB_CATC
 	tristate "USB CATC NetMate-based Ethernet device support"
@@ -550,4 +554,4 @@ config USBNET_IPA_BRIDGE
 	  Select this if you want to enable USB to IPA bridge.
 	  This will pass IP traffic directly to IPA and bypass the network stack.
 
-endmenu
+endif # USB_NET_DRIVERS
