@@ -1570,12 +1570,11 @@ static int smack_mmap_file(struct file *file,
  * Returns 0
  * Further research may be required on this one.
  */
-static int smack_file_set_fowner(struct file *file)
+static void smack_file_set_fowner(struct file *file)
 {
 	struct smack_known *skp = smk_of_current();
 
 	file->f_security = skp;
-	return 0;
 }
 
 /**
