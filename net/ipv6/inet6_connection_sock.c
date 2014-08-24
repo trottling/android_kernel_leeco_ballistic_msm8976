@@ -63,7 +63,6 @@ int inet6_csk_bind_conflict(const struct sock *sk,
 
 	return sk2 != NULL;
 }
-
 EXPORT_SYMBOL_GPL(inet6_csk_bind_conflict);
 
 struct dst_entry *inet6_csk_route_req(struct sock *sk,
@@ -147,7 +146,6 @@ struct request_sock *inet6_csk_search_req(const struct sock *sk,
 
 	return NULL;
 }
-
 EXPORT_SYMBOL_GPL(inet6_csk_search_req);
 
 void inet6_csk_reqsk_queue_hash_add(struct sock *sk,
@@ -163,7 +161,6 @@ void inet6_csk_reqsk_queue_hash_add(struct sock *sk,
 	reqsk_queue_hash_req(&icsk->icsk_accept_queue, h, req, timeout);
 	inet_csk_reqsk_queue_added(sk, timeout);
 }
-
 EXPORT_SYMBOL_GPL(inet6_csk_reqsk_queue_hash_add);
 
 void inet6_csk_addr2sockaddr(struct sock *sk, struct sockaddr *uaddr)
@@ -178,7 +175,6 @@ void inet6_csk_addr2sockaddr(struct sock *sk, struct sockaddr *uaddr)
 	sin6->sin6_scope_id = ipv6_iface_scope_id(&sin6->sin6_addr,
 						  sk->sk_bound_dev_if);
 }
-
 EXPORT_SYMBOL_GPL(inet6_csk_addr2sockaddr);
 
 static inline
