@@ -3273,7 +3273,6 @@ static void pktgen_xmit(struct pktgen_dev *pkt_dev)
 {
 	struct net_device *odev = pkt_dev->odev;
 	struct netdev_queue *txq;
-	u16 queue_map;
 	int ret;
 
 	/* If device is offline, then don't send */
@@ -3311,8 +3310,7 @@ static void pktgen_xmit(struct pktgen_dev *pkt_dev)
 	if (pkt_dev->delay && pkt_dev->last_ok)
 		spin(pkt_dev, pkt_dev->next_tx);
 
-	queue_map = skb_get_queue_mapping(pkt_dev->skb);
-	txq = netdev_get_tx_queue(odev, queue_map);
+	txq = skb_get_tx_queue(odev, pkt_dev->skb);
 
 	__netif_tx_lock_bh(txq);
 
