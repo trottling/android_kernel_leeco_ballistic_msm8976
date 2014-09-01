@@ -108,8 +108,8 @@ kirkwood := \
 	kirkwood-openblocks_a6.dtb \
 	kirkwood-openblocks_a7.dtb \
 	kirkwood-rd88f6192.dtb \
-	kirkwood-rd88f6281-a0.dtb \
-	kirkwood-rd88f6281-a1.dtb \
+	kirkwood-rd88f6281-z0.dtb \
+	kirkwood-rd88f6281-a.dtb \
 	kirkwood-rs212.dtb \
 	kirkwood-rs409.dtb \
 	kirkwood-rs411.dtb \
