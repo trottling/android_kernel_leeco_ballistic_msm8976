@@ -1834,16 +1834,32 @@ err1:
 }
 
 static int
-nf_tables_delrule_one(struct nft_ctx *ctx, struct nft_rule *rule)
+nf_tables_delrule_deactivate(struct nft_ctx *ctx, struct nft_rule *rule)
 {
 	/* You cannot delete the same rule twice */
 	if (nft_rule_is_active_next(ctx->net, rule)) {
-		if (nft_trans_rule_add(ctx, NFT_MSG_DELRULE, rule) == NULL)
-			return -ENOMEM;
 		nft_rule_disactivate_next(ctx->net, rule);
 		return 0;
 	}
 	return -ENOENT;
+}
+
+static int nft_delrule(struct nft_ctx *ctx, struct nft_rule *rule)
+{
+	struct nft_trans *trans;
+	int err;
+
+	trans = nft_trans_rule_add(ctx, NFT_MSG_DELRULE, rule);
+	if (trans == NULL)
+		return -ENOMEM;
+
+	err = nf_tables_delrule_deactivate(ctx, rule);
+	if (err < 0) {
+		nft_trans_destroy(trans);
+		return err;
+	}
+
+	return 0;
 }
 
 static int nf_table_delrule_by_chain(struct nft_ctx *ctx)
@@ -1852,7 +1868,7 @@ static int nf_table_delrule_by_chain(struct nft_ctx *ctx)
 	int err;
 
 	list_for_each_entry(rule, &ctx->chain->rules, list) {
-		err = nf_tables_delrule_one(ctx, rule);
+		err = nft_delrule(ctx, rule);
 		if (err < 0)
 			return err;
 	}
@@ -1897,7 +1913,7 @@ static int nf_tables_delrule(struct sock *nlsk, struct sk_buff *skb,
 			if (IS_ERR(rule))
 				return PTR_ERR(rule);
 
-			err = nf_tables_delrule_one(&ctx, rule);
+			err = nft_delrule(&ctx, rule);
 		} else {
 			err = nf_table_delrule_by_chain(&ctx);
 		}
