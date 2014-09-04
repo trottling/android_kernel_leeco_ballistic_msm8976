@@ -110,7 +110,7 @@ DECLARE_EVENT_CLASS(softirq,
  * @vec_nr:  softirq vector number
  *
  * When used in combination with the softirq_exit tracepoint
- * we can determine the softirq handler runtine.
+ * we can determine the softirq handler routine.
  */
 DEFINE_EVENT(softirq, softirq_entry,
 
@@ -124,7 +124,7 @@ DEFINE_EVENT(softirq, softirq_entry,
  * @vec_nr:  softirq vector number
  *
  * When used in combination with the softirq_entry tracepoint
- * we can determine the softirq handler runtine.
+ * we can determine the softirq handler routine.
  */
 DEFINE_EVENT(softirq, softirq_exit,
 
