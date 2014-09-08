@@ -238,6 +238,12 @@ config IP_NF_NAT
 
 if IP_NF_NAT
 
+config NFT_MASQ_IPV4
+	tristate "IPv4 masquerading support for nf_tables"
+	depends on NF_TABLES_IPV4
+	depends on NFT_MASQ
+	select NF_NAT_MASQUERADE_IPV4
+
 config IP_NF_TARGET_MASQUERADE
 	tristate "MASQUERADE target support"
 	default m if NETFILTER_ADVANCED=n

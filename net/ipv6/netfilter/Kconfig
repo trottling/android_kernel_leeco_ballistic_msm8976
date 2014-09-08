@@ -268,6 +268,12 @@ config IP6_NF_NAT
 
 if IP6_NF_NAT
 
+config NFT_MASQ_IPV6
+	tristate "IPv6 masquerade support for nf_tables"
+	depends on NF_TABLES_IPV6
+	depends on NFT_MASQ
+	select NF_NAT_MASQUERADE_IPV6
+
 config IP6_NF_TARGET_MASQUERADE
 	tristate "MASQUERADE target support"
 	help
