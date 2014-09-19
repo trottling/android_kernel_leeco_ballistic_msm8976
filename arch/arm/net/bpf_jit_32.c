@@ -16,6 +16,7 @@
 #include <linux/string.h>
 #include <linux/slab.h>
 #include <linux/if_vlan.h>
+
 #include <asm/cacheflush.h>
 #include <asm/hwcap.h>
 #include <asm/opcodes.h>
@@ -162,11 +163,10 @@ static inline int mem_words_used(struct jit_ctx *ctx)
 
 static void jit_fill_hole(void *area, unsigned int size)
 {
-	/* Insert illegal UND instructions. */
-	u32 *ptr, fill_ins = 0xe7ffffff;
+	u32 *ptr;
 	/* We are guaranteed to have aligned memory. */
 	for (ptr = area; size >= sizeof(u32); size -= sizeof(u32))
-		*ptr++ = fill_ins;
+		*ptr++ = __opcode_to_mem_arm(ARM_INST_UDF);
 }
 
 static void build_prologue(struct jit_ctx *ctx)
