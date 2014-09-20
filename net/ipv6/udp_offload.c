@@ -18,23 +18,6 @@
 
 static int udp6_ufo_send_check(struct sk_buff *skb)
 {
-	const struct ipv6hdr *ipv6h;
-	struct udphdr *uh;
-
-	if (!pskb_may_pull(skb, sizeof(*uh)))
-		return -EINVAL;
-
-	if (likely(!skb->encapsulation)) {
-		ipv6h = ipv6_hdr(skb);
-		uh = udp_hdr(skb);
-
-		uh->check = ~csum_ipv6_magic(&ipv6h->saddr, &ipv6h->daddr, skb->len,
-					     IPPROTO_UDP, 0);
-		skb->csum_start = skb_transport_header(skb) - skb->head;
-		skb->csum_offset = offsetof(struct udphdr, check);
-		skb->ip_summed = CHECKSUM_PARTIAL;
-	}
-
 	return 0;
 }
 
@@ -102,7 +85,6 @@ static struct sk_buff *udp6_ufo_fragment(struct sk_buff *skb,
 	u8 *packet_start, *prevhdr;
 	u8 nexthdr;
 	u8 frag_hdr_sz = sizeof(struct frag_hdr);
-	int offset;
 	__wsum csum;
 	int tnl_hlen;
 
@@ -133,13 +115,27 @@ static struct sk_buff *udp6_ufo_fragment(struct sk_buff *skb,
 	if (skb->encapsulation && skb_shinfo(skb)->gso_type & SKB_GSO_UDP_TUNNEL)
 		segs = skb_udp6_tunnel_segment(skb, features);
 	else {
+		const struct ipv6hdr *ipv6h;
+		struct udphdr *uh;
+
+		if (!pskb_may_pull(skb, sizeof(struct udphdr)))
+			goto out;
+
 		/* Do software UFO. Complete and fill in the UDP checksum as HW cannot
 		 * do checksum of UDP packets sent as multiple IP fragments.
 		 */
-		offset = skb_checksum_start_offset(skb);
-		csum = skb_checksum(skb, offset, skb->len - offset, 0);
-		offset += skb->csum_offset;
-		*(__sum16 *)(skb->data + offset) = csum_fold(csum);
+
+		uh = udp_hdr(skb);
+		ipv6h = ipv6_hdr(skb);
+
+		uh->check = 0;
+		csum = skb_checksum(skb, 0, skb->len, 0);
+		uh->check = udp_v6_check(skb->len, &ipv6h->saddr,
+					  &ipv6h->daddr, csum);
+
+		if (uh->check == 0)
+			uh->check = CSUM_MANGLED_0;
+
 		skb->ip_summed = CHECKSUM_NONE;
 
 		/* Check if there is enough headroom to insert fragment header. */
