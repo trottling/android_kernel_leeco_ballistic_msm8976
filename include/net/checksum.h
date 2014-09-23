@@ -96,9 +96,7 @@ static inline __wsum csum_unfold(__sum16 n)
 
 static inline void csum_replace4(__sum16 *sum, __be32 from, __be32 to)
 {
-	__be32 diff[] = { ~from, to };
-
-	*sum = csum_fold(csum_partial(diff, sizeof(diff), ~csum_unfold(*sum)));
+	*sum = csum_fold(csum_add(csum_sub(~csum_unfold(*sum), from), to));
 }
 
 static inline void csum_replace2(__sum16 *sum, __be16 from, __be16 to)
