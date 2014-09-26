@@ -21,6 +21,7 @@
 struct sk_buff;
 struct sock;
 struct seccomp_data;
+struct bpf_prog_aux;
 
 /* ArgX, context and stack frame pointer register positions. Note,
  * Arg1, Arg2, Arg3, etc are used as argument mappings of function
@@ -300,17 +301,12 @@ struct bpf_binary_header {
 	u8 image[];
 };
 
-struct bpf_work_struct {
-	struct bpf_prog *prog;
-	struct work_struct work;
-};
-
 struct bpf_prog {
 	u32			pages;		/* Number of allocated pages */
 	u32			jited:1,	/* Is our filter JIT'ed? */
 				len:31;		/* Number of filter blocks */
 	struct sock_fprog_kern	*orig_prog;	/* Original BPF program */
-	struct bpf_work_struct	*work;		/* Deferred free work struct */
+	struct bpf_prog_aux	*aux;		/* Auxiliary fields */
 	unsigned int		(*bpf_func)(const struct sk_buff *skb,
 					    const struct bpf_insn *filter);
 	/* Instructions for interpreter */
