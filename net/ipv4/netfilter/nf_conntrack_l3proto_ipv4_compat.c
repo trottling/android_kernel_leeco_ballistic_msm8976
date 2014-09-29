@@ -150,8 +150,10 @@ static int ct_seq_show(struct seq_file *s, void *v)
 	if (seq_has_overflowed(s))
 		goto release;
 
-	if (print_tuple(s, &ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple,
-			l3proto, l4proto))
+	print_tuple(s, &ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple,
+		    l3proto, l4proto);
+
+	if (seq_has_overflowed(s))
 		goto release;
 
 	if (seq_print_acct(s, ct, IP_CT_DIR_ORIGINAL))
@@ -160,8 +162,10 @@ static int ct_seq_show(struct seq_file *s, void *v)
 	if (!(test_bit(IPS_SEEN_REPLY_BIT, &ct->status)))
 		seq_printf(s, "[UNREPLIED] ");
 
-	if (print_tuple(s, &ct->tuplehash[IP_CT_DIR_REPLY].tuple,
-			l3proto, l4proto))
+	print_tuple(s, &ct->tuplehash[IP_CT_DIR_REPLY].tuple,
+		    l3proto, l4proto);
+
+	if (seq_has_overflowed(s))
 		goto release;
 
 	if (seq_print_acct(s, ct, IP_CT_DIR_REPLY))

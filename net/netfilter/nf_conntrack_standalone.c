@@ -36,12 +36,13 @@
 MODULE_LICENSE("GPL");
 
 #ifdef CONFIG_NF_CONNTRACK_PROCFS
-int
+void
 print_tuple(struct seq_file *s, const struct nf_conntrack_tuple *tuple,
             const struct nf_conntrack_l3proto *l3proto,
             const struct nf_conntrack_l4proto *l4proto)
 {
-	return l3proto->print_tuple(s, tuple) || l4proto->print_tuple(s, tuple);
+	l3proto->print_tuple(s, tuple);
+	l4proto->print_tuple(s, tuple);
 }
 EXPORT_SYMBOL_GPL(print_tuple);
 
@@ -198,9 +199,8 @@ static int ct_seq_show(struct seq_file *s, void *v)
 	if (l4proto->print_conntrack)
 		l4proto->print_conntrack(s, ct);
 
-	if (print_tuple(s, &ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple,
-			l3proto, l4proto))
-		goto release;
+	print_tuple(s, &ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple,
+		    l3proto, l4proto);
 
 	if (seq_has_overflowed(s))
 		goto release;
@@ -211,9 +211,8 @@ static int ct_seq_show(struct seq_file *s, void *v)
 	if (!(test_bit(IPS_SEEN_REPLY_BIT, &ct->status)))
 		seq_printf(s, "[UNREPLIED] ");
 
-	if (print_tuple(s, &ct->tuplehash[IP_CT_DIR_REPLY].tuple,
-			l3proto, l4proto))
-		goto release;
+	print_tuple(s, &ct->tuplehash[IP_CT_DIR_REPLY].tuple,
+		    l3proto, l4proto);
 
 	if (seq_print_acct(s, ct, IP_CT_DIR_REPLY))
 		goto release;
