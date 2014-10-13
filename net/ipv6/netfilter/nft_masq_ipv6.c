@@ -60,6 +60,7 @@ static const struct nft_expr_ops nft_masq_ipv6_ops = {
 	.init		= nft_masq_ipv6_init,
 	.destroy	= nft_masq_ipv6_destroy,
 	.dump		= nft_masq_dump,
+	.validate	= nft_masq_validate,
 };
 
 static struct nft_expr_type nft_masq_ipv6_type __read_mostly = {
