@@ -747,6 +747,7 @@ struct tcp_skb_cb {
 #define TCP_SKB_CB(__skb)	((struct tcp_skb_cb *)&((__skb)->cb[0]))
 
 
+#if IS_ENABLED(CONFIG_IPV6)
 /* This is the variant of inet6_iif() that must be used by TCP,
  * as TCP moves IP6CB into a different location in skb->cb[]
  */
@@ -754,6 +755,7 @@ static inline int tcp_v6_iif(const struct sk_buff *skb)
 {
 	return TCP_SKB_CB(skb)->header.h6.iif;
 }
+#endif
 
 /* Due to TSO, an SKB can be composed of multiple actual
  * packets.  To keep these tracked properly, we use this.
