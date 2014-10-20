@@ -1775,7 +1775,7 @@ int tipc_sk_rcv(struct sk_buff *buf)
 	sk = &tsk->sk;
 
 	/* Queue message */
-	bh_lock_sock(sk);
+	spin_lock_bh(&sk->sk_lock.slock);
 
 	if (!sock_owned_by_user(sk)) {
 		rc = filter_rcv(sk, buf);
@@ -1786,7 +1786,7 @@ int tipc_sk_rcv(struct sk_buff *buf)
 		if (sk_add_backlog(sk, buf, limit))
 			rc = -TIPC_ERR_OVERLOAD;
 	}
-	bh_unlock_sock(sk);
+	spin_unlock_bh(&sk->sk_lock.slock);
 	tipc_sk_put(tsk);
 	if (likely(!rc))
 		return 0;
