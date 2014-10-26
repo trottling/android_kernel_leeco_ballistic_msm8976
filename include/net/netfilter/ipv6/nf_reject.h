@@ -161,4 +161,14 @@ static void nf_send_reset6(struct net *net, struct sk_buff *oldskb, int hook)
 		ip6_local_out(nskb);
 }
 
+const struct tcphdr *nf_reject_ip6_tcphdr_get(struct sk_buff *oldskb,
+					      struct tcphdr *otcph,
+					      unsigned int *otcplen, int hook);
+struct ipv6hdr *nf_reject_ip6hdr_put(struct sk_buff *nskb,
+				     const struct sk_buff *oldskb,
+				     __be16 protocol, int hoplimit);
+void nf_reject_ip6_tcphdr_put(struct sk_buff *nskb,
+			      const struct sk_buff *oldskb,
+			      const struct tcphdr *oth, unsigned int otcplen);
+
 #endif /* _IPV6_NF_REJECT_H */
