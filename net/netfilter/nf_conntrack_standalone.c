@@ -195,8 +195,8 @@ static int ct_seq_show(struct seq_file *s, void *v)
 		   timer_pending(&ct->timeout)
 		   ? (long)(ct->timeout.expires - jiffies)/HZ : 0);
 
-	if (l4proto->print_conntrack && l4proto->print_conntrack(s, ct))
-		goto release;
+	if (l4proto->print_conntrack)
+		l4proto->print_conntrack(s, ct);
 
 	if (print_tuple(s, &ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple,
 			l3proto, l4proto))
