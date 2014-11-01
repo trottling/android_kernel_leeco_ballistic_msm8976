@@ -50,7 +50,7 @@ struct user_namespace init_user_ns = {
 	.count = ATOMIC_INIT(3),
 	.owner = GLOBAL_ROOT_UID,
 	.group = GLOBAL_ROOT_GID,
-	.proc_inum = PROC_USER_INIT_INO,
+	.ns.inum = PROC_USER_INIT_INO,
 	.flags = USERNS_INIT_FLAGS,
 #ifdef CONFIG_KEYS_KERBEROS_CACHE
 	.krb_cache_register_sem =
