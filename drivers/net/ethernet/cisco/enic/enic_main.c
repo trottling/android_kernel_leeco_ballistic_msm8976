@@ -1281,7 +1281,10 @@ static void enic_rq_indicate_buf(struct vnic_rq *rq,
 				enic->rq_truncated_pkts++;
 		}
 
+		pci_unmap_single(enic->pdev, buf->dma_addr, buf->len,
+				 PCI_DMA_FROMDEVICE);
 		dev_kfree_skb_any(skb);
+		buf->os_buf = NULL;
 
 		return;
 	}
@@ -1315,7 +1318,10 @@ static void enic_rq_indicate_buf(struct vnic_rq *rq,
 		/* Buffer overflow
 		 */
 
+		pci_unmap_single(enic->pdev, buf->dma_addr, buf->len,
+				 PCI_DMA_FROMDEVICE);
 		dev_kfree_skb_any(skb);
+		buf->os_buf = NULL;
 	}
 }
 
