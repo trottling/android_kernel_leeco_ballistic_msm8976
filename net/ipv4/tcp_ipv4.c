@@ -2017,6 +2017,7 @@ process:
 	th = (const struct tcphdr *)skb->data;
 	iph = ip_hdr(skb);
 
+	sk_incoming_cpu_update(sk);
 	skb->dev = NULL;
 
 	bh_lock_sock_nested(sk);
