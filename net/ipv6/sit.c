@@ -1194,7 +1194,8 @@ ipip6_tunnel_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 			if (copy_from_user(&p, ifr->ifr_ifru.ifru_data, sizeof(p)))
 				goto done;
 			err = -ENOENT;
-			if ((t = ipip6_tunnel_locate(net, &p, 0)) == NULL)
+			t = ipip6_tunnel_locate(net, &p, 0);
+			if (t == NULL)
 				goto done;
 			err = -EPERM;
 			if (t == netdev_priv(sitn->fb_tunnel_dev))
@@ -1704,8 +1705,8 @@ static int __net_init sit_init_net(struct net *net)
 		goto err_dev_free;
 
 	ipip6_tunnel_clone_6rd(sitn->fb_tunnel_dev, sitn);
-
-	if ((err = register_netdev(sitn->fb_tunnel_dev)))
+	err = register_netdev(sitn->fb_tunnel_dev);
+	if (err)
 		goto err_reg_dev;
 
 	t = netdev_priv(sitn->fb_tunnel_dev);
