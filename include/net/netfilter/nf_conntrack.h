@@ -97,11 +97,17 @@ struct nf_conn {
 	/* Have we seen traffic both ways yet? (bitset) */
 	unsigned long status;
 
-	/* If we were expected by an expectation, this will be it */
-	struct nf_conn *master;
-
 	/* Timer function; drops refcnt when it goes off. */
 	struct timer_list timeout;
+
+#ifdef CONFIG_NET_NS
+	struct net *ct_net;
+#endif
+	/* all members below initialized via memset */
+	u8 __nfct_init_offset[0];
+
+	/* If we were expected by an expectation, this will be it */
+	struct nf_conn *master;
 
 #if defined(CONFIG_NF_CONNTRACK_MARK)
 	u_int32_t mark;
@@ -113,9 +119,6 @@ struct nf_conn {
 
 	/* Extensions */
 	struct nf_ct_ext *ext;
-#ifdef CONFIG_NET_NS
-	struct net *ct_net;
-#endif
 
 #if defined(CONFIG_IP_NF_TARGET_NATTYPE_MODULE)
 	unsigned long nattype_entry;
