@@ -151,7 +151,7 @@ htable_bits(u32 hashsize)
 
 #define SET_HOST_MASK(family)	(family == AF_INET ? 32 : 128)
 
-#ifdef IP_SET_HASH_WITH_MULTI
+#ifdef IP_SET_HASH_WITH_NET0
 #define NLEN(family)		(SET_HOST_MASK(family) + 1)
 #else
 #define NLEN(family)		SET_HOST_MASK(family)
