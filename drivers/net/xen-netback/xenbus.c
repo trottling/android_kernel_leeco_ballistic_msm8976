@@ -202,6 +202,7 @@ static void backend_create_xenvif(struct backend_info *be)
 	int err;
 	long handle;
 	struct xenbus_device *dev = be->dev;
+	struct xenvif *vif;
 
 	if (be->vif != NULL)
 		return;
@@ -212,13 +213,13 @@ static void backend_create_xenvif(struct backend_info *be)
 		return;
 	}
 
-	be->vif = xenvif_alloc(&dev->dev, dev->otherend_id, handle);
-	if (IS_ERR(be->vif)) {
-		err = PTR_ERR(be->vif);
-		be->vif = NULL;
+	vif = xenvif_alloc(&dev->dev, dev->otherend_id, handle);
+	if (IS_ERR(vif)) {
+		err = PTR_ERR(vif);
 		xenbus_dev_fatal(dev, err, "creating interface");
 		return;
 	}
+	be->vif = vif;
 
 	kobject_uevent(&dev->dev.kobj, KOBJ_ONLINE);
 }
