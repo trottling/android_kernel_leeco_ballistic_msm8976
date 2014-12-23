@@ -38,6 +38,9 @@ struct genl_info;
  *	do additional, common, filtering and return an error
  * @post_doit: called after an operation's doit callback, it may
  *	undo operations done by pre_doit, for example release locks
+ * @mcast_bind: a socket bound to the given multicast group (which
+ *	is given as the offset into the groups array)
+ * @mcast_unbind: a socket was unbound from the given multicast group
  * @attrbuf: buffer to store parsed attributes
  * @ops_list: list of all assigned operations
  * @family_list: family list
@@ -57,6 +60,8 @@ struct genl_family {
 	void			(*post_doit)(struct genl_ops *ops,
 					     struct sk_buff *skb,
 					     struct genl_info *info);
+	int			(*mcast_bind)(int group);
+	void			(*mcast_unbind)(int group);
 	struct nlattr **	attrbuf;	/* private */
 	struct list_head	ops_list;	/* private */
 	struct list_head	family_list;	/* private */
