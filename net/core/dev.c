@@ -2517,7 +2517,7 @@ static int dev_gso_segment(struct sk_buff *skb, netdev_features_t features)
 /* If MPLS offload request, verify we are testing hardware MPLS features
  * instead of standard features for the netdev.
  */
-#ifdef CONFIG_NET_MPLS_GSO
+#if IS_ENABLED(CONFIG_NET_MPLS_GSO)
 static netdev_features_t net_mpls_features(struct sk_buff *skb,
 					   netdev_features_t features,
 					   __be16 type)
