@@ -143,7 +143,8 @@ static int geneve_hlen(struct genevehdr *gh)
 }
 
 static struct sk_buff **geneve_gro_receive(struct sk_buff **head,
-					   struct sk_buff *skb)
+					   struct sk_buff *skb,
+					   struct udp_offload *uoff)
 {
 	struct sk_buff *p, **pp = NULL;
 	struct genevehdr *gh, *gh2;
@@ -207,7 +208,8 @@ out:
 	return pp;
 }
 
-static int geneve_gro_complete(struct sk_buff *skb, int nhoff)
+static int geneve_gro_complete(struct sk_buff *skb, int nhoff,
+			       struct udp_offload *uoff)
 {
 	struct genevehdr *gh;
 	struct packet_offload *ptype;
