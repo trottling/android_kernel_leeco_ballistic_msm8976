@@ -1067,6 +1067,7 @@ static int __init cpufreq_stats_init(void)
 		return ret;
 	}
 
+	WARN_ON(cpufreq_get_global_kobject());
 	ret = cpufreq_sysfs_create_file(&_attr_all_time_in_state.attr);
 	if (ret)
 		pr_warn("Cannot create sysfs file for cpufreq stats\n");
@@ -1095,6 +1096,7 @@ static void __exit cpufreq_stats_exit(void)
 		cpufreq_stats_free_table(cpu);
 	cpufreq_allstats_free();
 	cpufreq_powerstats_free();
+	cpufreq_put_global_kobject();
 }
 MODULE_AUTHOR("Zou Nan hai <nanhai.zou@intel.com>");
 MODULE_DESCRIPTION("'cpufreq_stats' - A driver to export cpufreq stats "
