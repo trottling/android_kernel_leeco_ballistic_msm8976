@@ -1301,6 +1301,8 @@ struct net_device {
 	struct list_head	napi_list;
 	struct list_head	unreg_list;
 	struct list_head	close_list;
+	struct list_head	ptype_all;
+	struct list_head	ptype_specific;
 
 	/* directly linked devices, like slaves for bonding */
 	struct {
