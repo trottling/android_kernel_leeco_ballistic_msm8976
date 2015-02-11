@@ -290,7 +290,7 @@ set_match_v4(const struct sk_buff *skb, struct xt_action_param *par)
 		return ret;
 
 	if (!match_counter0(opt.ext.packets, &info->packets))
-		return 0;
+		return false;
 	return match_counter0(opt.ext.bytes, &info->bytes);
 }
 
@@ -336,7 +336,7 @@ set_match_v4(const struct sk_buff *skb, struct xt_action_param *par)
 		return ret;
 
 	if (!match_counter(opt.ext.packets, &info->packets))
-		return 0;
+		return false;
 	return match_counter(opt.ext.bytes, &info->bytes);
 }
 
