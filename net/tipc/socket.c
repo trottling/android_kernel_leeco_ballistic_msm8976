@@ -2351,8 +2351,6 @@ int tipc_sk_rht_init(void)
 		.hashfn = jhash,
 		.max_shift = 20, /* 1M */
 		.min_shift = 8,  /* 256 */
-		.grow_decision = rht_grow_above_75,
-		.shrink_decision = rht_shrink_below_30,
 	};
 
 	return rhashtable_init(&tipc_sk_rht, &rht_params);
