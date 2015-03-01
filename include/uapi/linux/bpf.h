@@ -117,6 +117,7 @@ enum bpf_map_type {
 enum bpf_prog_type {
 	BPF_PROG_TYPE_UNSPEC,
 	BPF_PROG_TYPE_SOCKET_FILTER,
+	BPF_PROG_TYPE_SCHED_CLS,
 };
 
 /* flags for BPF_MAP_UPDATE_ELEM command */
