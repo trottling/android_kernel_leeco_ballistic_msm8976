@@ -2848,10 +2848,14 @@ void tcp_get_info(struct sock *sk, struct tcp_info *info)
 	info->tcpi_segs_out = tp->segs_out;
 	info->tcpi_segs_in = tp->segs_in;
 
-	if (sk->sk_socket) {
+	/*
+	* Expose reference count for socket.
+	*/
+	if (NULL != sk->sk_socket) {
 		struct file *filep = sk->sk_socket->file;
+
 		if (filep)
-			info->tcpi_count = atomic_read(&filep->f_count);
+			info->tcpi_count = file_count(filep);
 	}
 }
 EXPORT_SYMBOL_GPL(tcp_get_info);
