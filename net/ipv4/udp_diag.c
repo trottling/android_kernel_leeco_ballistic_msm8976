@@ -19,8 +19,9 @@
 #include <net/ipv6.h>
 
 static int sk_diag_dump(struct sock *sk, struct sk_buff *skb,
-		struct netlink_callback *cb, struct inet_diag_req_v2 *req,
-		struct nlattr *bc, bool net_admin)
+			struct netlink_callback *cb,
+			const struct inet_diag_req_v2 *req,
+			struct nlattr *bc, bool net_admin)
 {
 	if (!inet_diag_bc_sk(bc, sk))
 		return 0;
@@ -32,7 +33,8 @@ static int sk_diag_dump(struct sock *sk, struct sk_buff *skb,
 }
 
 static int udp_dump_one(struct udp_table *tbl, struct sk_buff *in_skb,
-		const struct nlmsghdr *nlh, struct inet_diag_req_v2 *req)
+			const struct nlmsghdr *nlh,
+			const struct inet_diag_req_v2 *req)
 {
 	int err = -EINVAL;
 	struct sock *sk;
@@ -92,8 +94,9 @@ out_nosk:
 	return err;
 }
 
-static void udp_dump(struct udp_table *table, struct sk_buff *skb, struct netlink_callback *cb,
-		struct inet_diag_req_v2 *r, struct nlattr *bc)
+static void udp_dump(struct udp_table *table, struct sk_buff *skb,
+		     struct netlink_callback *cb,
+		     const struct inet_diag_req_v2 *r, struct nlattr *bc)
 {
 	int num, s_num, slot, s_slot;
 	struct net *net = sock_net(skb->sk);
@@ -147,13 +150,13 @@ done:
 }
 
 static void udp_diag_dump(struct sk_buff *skb, struct netlink_callback *cb,
-		struct inet_diag_req_v2 *r, struct nlattr *bc)
+			  const struct inet_diag_req_v2 *r, struct nlattr *bc)
 {
 	udp_dump(&udp_table, skb, cb, r, bc);
 }
 
 static int udp_diag_dump_one(struct sk_buff *in_skb, const struct nlmsghdr *nlh,
-		struct inet_diag_req_v2 *req)
+			     const struct inet_diag_req_v2 *req)
 {
 	return udp_dump_one(&udp_table, in_skb, nlh, req);
 }
@@ -225,13 +228,13 @@ static int __udp_diag_destroy(struct sk_buff *in_skb,
 }
 
 static int udp_diag_destroy(struct sk_buff *in_skb,
-			    struct inet_diag_req_v2 *req)
+			    const struct inet_diag_req_v2 *req)
 {
 	return __udp_diag_destroy(in_skb, req, &udp_table);
 }
 
 static int udplite_diag_destroy(struct sk_buff *in_skb,
-				struct inet_diag_req_v2 *req)
+				const struct inet_diag_req_v2 *req)
 {
 	return __udp_diag_destroy(in_skb, req, &udplite_table);
 }
@@ -249,13 +252,14 @@ static const struct inet_diag_handler udp_diag_handler = {
 };
 
 static void udplite_diag_dump(struct sk_buff *skb, struct netlink_callback *cb,
-		struct inet_diag_req_v2 *r, struct nlattr *bc)
+			      const struct inet_diag_req_v2 *r,
+			      struct nlattr *bc)
 {
 	udp_dump(&udplite_table, skb, cb, r, bc);
 }
 
 static int udplite_diag_dump_one(struct sk_buff *in_skb, const struct nlmsghdr *nlh,
-		struct inet_diag_req_v2 *req)
+				 const struct inet_diag_req_v2 *req)
 {
 	return udp_dump_one(&udplite_table, in_skb, nlh, req);
 }

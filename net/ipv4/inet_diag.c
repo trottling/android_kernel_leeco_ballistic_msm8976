@@ -229,7 +229,7 @@ EXPORT_SYMBOL_GPL(inet_sk_diag_fill);
 
 static int inet_csk_diag_fill(struct sock *sk,
 			      struct sk_buff *skb,
-			      struct inet_diag_req_v2 *req,
+			      const struct inet_diag_req_v2 *req,
 			      struct user_namespace *user_ns,
 			      u32 portid, u32 seq, u16 nlmsg_flags,
 			      const struct nlmsghdr *unlh,
@@ -241,7 +241,7 @@ static int inet_csk_diag_fill(struct sock *sk,
 
 static int inet_twsk_diag_fill(struct inet_timewait_sock *tw,
 			       struct sk_buff *skb,
-			       struct inet_diag_req_v2 *req,
+			       const struct inet_diag_req_v2 *req,
 			       u32 portid, u32 seq, u16 nlmsg_flags,
 			       const struct nlmsghdr *unlh)
 {
@@ -294,7 +294,7 @@ static int inet_twsk_diag_fill(struct inet_timewait_sock *tw,
 }
 
 static int sk_diag_fill(struct sock *sk, struct sk_buff *skb,
-			struct inet_diag_req_v2 *r,
+			const struct inet_diag_req_v2 *r,
 			struct user_namespace *user_ns,
 			u32 portid, u32 seq, u16 nlmsg_flags,
 			const struct nlmsghdr *unlh, bool net_admin)
@@ -393,7 +393,7 @@ EXPORT_SYMBOL_GPL(inet_diag_dump_one_icsk);
 
 static int inet_diag_cmd_exact(int cmd, struct sk_buff *in_skb,
 			       const struct nlmsghdr *nlh,
-			       struct inet_diag_req_v2 *req)
+			       const struct inet_diag_req_v2 *req)
 {
 	const struct inet_diag_handler *handler;
 	int err;
@@ -671,7 +671,7 @@ static int inet_diag_bc_audit(const struct nlattr *attr)
 static int inet_csk_diag_dump(struct sock *sk,
 			      struct sk_buff *skb,
 			      struct netlink_callback *cb,
-			      struct inet_diag_req_v2 *r,
+			      const struct inet_diag_req_v2 *r,
 			      const struct nlattr *bc,
 			      bool net_admin)
 {
@@ -714,7 +714,7 @@ static void twsk_build_assert(void)
 static int inet_twsk_diag_dump(struct sock *sk,
 			       struct sk_buff *skb,
 			       struct netlink_callback *cb,
-			       struct inet_diag_req_v2 *r,
+			       const struct inet_diag_req_v2 *r,
 			       const struct nlattr *bc)
 {
 	twsk_build_assert();
@@ -816,7 +816,7 @@ static int inet_diag_fill_req(struct sk_buff *skb, struct sock *sk,
 
 static int inet_diag_dump_reqs(struct sk_buff *skb, struct sock *sk,
 			       struct netlink_callback *cb,
-			       struct inet_diag_req_v2 *r,
+			       const struct inet_diag_req_v2 *r,
 			       const struct nlattr *bc)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
@@ -888,7 +888,7 @@ out:
 
 void inet_diag_dump_icsk(struct inet_hashinfo *hashinfo, struct sk_buff *skb,
 			 struct netlink_callback *cb,
-			 struct inet_diag_req_v2 *r, struct nlattr *bc)
+			 const struct inet_diag_req_v2 *r, struct nlattr *bc)
 {
 	struct net *net = sock_net(skb->sk);
 	int i, num, s_i, s_num;
@@ -1027,7 +1027,7 @@ out:
 EXPORT_SYMBOL_GPL(inet_diag_dump_icsk);
 
 static int __inet_diag_dump(struct sk_buff *skb, struct netlink_callback *cb,
-			    struct inet_diag_req_v2 *r,
+			    const struct inet_diag_req_v2 *r,
 			    struct nlattr *bc)
 {
 	const struct inet_diag_handler *handler;
