@@ -169,6 +169,7 @@ enum rq_flag_bits {
 	__REQ_NOIDLE,		/* don't anticipate more IO after this one */
 	__REQ_FUA,		/* forced unit access */
 	__REQ_FLUSH,		/* request for cache flush */
+	__REQ_BARRIER,		/* marks flush req as barrier */
 
 	/* bio only flags */
 	__REQ_RAHEAD,		/* read ahead, can fail anytime */
@@ -216,7 +217,7 @@ enum rq_flag_bits {
 #define REQ_COMMON_MASK \
 	(REQ_WRITE | REQ_FAILFAST_MASK | REQ_SYNC | REQ_META | REQ_PRIO | \
 	 REQ_DISCARD | REQ_WRITE_SAME | REQ_NOIDLE | REQ_FLUSH | REQ_FUA | \
-	 REQ_SECURE)
+	 REQ_SECURE | REQ_BARRIER)
 #define REQ_CLONE_MASK		REQ_COMMON_MASK
 
 #define BIO_NO_ADVANCE_ITER_MASK	(REQ_DISCARD|REQ_WRITE_SAME)
@@ -231,6 +232,7 @@ enum rq_flag_bits {
 #define REQ_SORTED		(1 << __REQ_SORTED)
 #define REQ_SOFTBARRIER		(1 << __REQ_SOFTBARRIER)
 #define REQ_FUA			(1 << __REQ_FUA)
+#define REQ_BARRIER		(1 << __REQ_BARRIER)
 #define REQ_NOMERGE		(1 << __REQ_NOMERGE)
 #define REQ_STARTED		(1 << __REQ_STARTED)
 #define REQ_DONTPREP		(1 << __REQ_DONTPREP)
