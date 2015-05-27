@@ -18,6 +18,7 @@ struct sock;
 struct local_ports {
 	seqlock_t	lock;
 	int		range[2];
+	bool		warned;
 };
 
 struct ping_group_range {
