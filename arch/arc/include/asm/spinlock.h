@@ -75,7 +75,9 @@ static inline void arch_spin_unlock(arch_spinlock_t *lock)
 static inline int arch_read_trylock(arch_rwlock_t *rw)
 {
 	int ret = 0;
+	unsigned long flags;
 
+	local_irq_save(flags);
 	arch_spin_lock(&(rw->lock_mutex));
 
 	/*
@@ -88,6 +90,7 @@ static inline int arch_read_trylock(arch_rwlock_t *rw)
 	}
 
 	arch_spin_unlock(&(rw->lock_mutex));
+	local_irq_restore(flags);
 
 	smp_mb();
 	return ret;
@@ -97,7 +100,9 @@ static inline int arch_read_trylock(arch_rwlock_t *rw)
 static inline int arch_write_trylock(arch_rwlock_t *rw)
 {
 	int ret = 0;
+	unsigned long flags;
 
+	local_irq_save(flags);
 	arch_spin_lock(&(rw->lock_mutex));
 
 	/*
@@ -111,6 +116,7 @@ static inline int arch_write_trylock(arch_rwlock_t *rw)
 		ret = 1;
 	}
 	arch_spin_unlock(&(rw->lock_mutex));
+	local_irq_restore(flags);
 
 	return ret;
 }
@@ -129,16 +135,24 @@ static inline void arch_write_lock(arch_rwlock_t *rw)
 
 static inline void arch_read_unlock(arch_rwlock_t *rw)
 {
+	unsigned long flags;
+
+	local_irq_save(flags);
 	arch_spin_lock(&(rw->lock_mutex));
 	rw->counter++;
 	arch_spin_unlock(&(rw->lock_mutex));
+	local_irq_restore(flags);
 }
 
 static inline void arch_write_unlock(arch_rwlock_t *rw)
 {
+	unsigned long flags;
+
+	local_irq_save(flags);
 	arch_spin_lock(&(rw->lock_mutex));
 	rw->counter = __ARCH_RW_LOCK_UNLOCKED__;
 	arch_spin_unlock(&(rw->lock_mutex));
+	local_irq_restore(flags);
 }
 
 #define arch_read_lock_flags(lock, flags)	arch_read_lock(lock)
