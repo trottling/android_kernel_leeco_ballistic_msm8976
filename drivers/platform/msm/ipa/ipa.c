@@ -3515,6 +3515,7 @@ static int ipa_init(const struct ipa_plat_drv_res *resource_p,
 	ipa_ctx->modem_cfg_emb_pipe_flt = resource_p->modem_cfg_emb_pipe_flt;
 	ipa_ctx->wan_rx_ring_size = resource_p->wan_rx_ring_size;
 	ipa_ctx->skip_uc_pipe_reset = resource_p->skip_uc_pipe_reset;
+	ipa_ctx->use_dma_zone = resource_p->use_dma_zone;
 	ipa_ctx->tethered_flow_control = resource_p->tethered_flow_control;
 
 	/* default aggregation parameters */
@@ -4087,6 +4088,13 @@ static int get_ipa_dts_configuration(struct platform_device *pdev,
 		"qcom,skip-uc-pipe-reset");
 	IPADBG(": skip uC pipe reset = %s\n",
 		ipa_drv_res->skip_uc_pipe_reset
+		? "True" : "False");
+
+	ipa_drv_res->use_dma_zone =
+		of_property_read_bool(pdev->dev.of_node,
+		"qcom,use-dma-zone");
+	IPADBG(": use dma zone = %s\n",
+		ipa_drv_res->use_dma_zone
 		? "True" : "False");
 
 	ipa_drv_res->tethered_flow_control =
