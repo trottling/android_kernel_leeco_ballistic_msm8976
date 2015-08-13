@@ -184,6 +184,7 @@ int __ipa_generate_rt_hw_rule_v2_5(enum ipa_ip_type ip,
 
 	if (entry->proc_ctx || (entry->hdr && entry->hdr->is_hdr_proc_ctx)) {
 		struct ipa_hdr_proc_ctx_entry *proc_ctx;
+
 		proc_ctx = (entry->proc_ctx) ? : entry->hdr->proc_ctx;
 		rule_hdr->u.hdr_v2_5.system = !ipa_ctx->hdr_proc_ctx_tbl_lcl;
 		BUG_ON(proc_ctx->offset_entry->offset & 31);

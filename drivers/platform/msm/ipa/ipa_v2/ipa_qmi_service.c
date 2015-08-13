@@ -250,6 +250,7 @@ static int ipa_a5_svc_req_desc_cb(unsigned int msg_id,
 				struct msg_desc **req_desc)
 {
 	int rc;
+
 	switch (msg_id) {
 	case QMI_IPA_INDICATION_REGISTER_REQ_V01:
 		*req_desc = &ipa_indication_reg_req_desc;
@@ -279,6 +280,7 @@ static int ipa_a5_svc_req_cb(struct qmi_handle *handle, void *conn_h,
 			void *req_h, unsigned int msg_id, void *req)
 {
 	int rc;
+
 	if (ipa_svc_handle != handle || curr_conn != conn_h)
 		return -EINVAL;
 
@@ -701,6 +703,7 @@ int qmi_filter_notify_send(struct ipa_fltr_installed_notif_req_msg_v01 *req)
 static void ipa_q6_clnt_recv_msg(struct work_struct *work)
 {
 	int rc;
+
 	rc = qmi_recv_msg(ipa_q6_clnt);
 	if (rc < 0)
 		IPAWANERR("Error receiving message\n");
@@ -958,7 +961,6 @@ destroy_ipa_A7_svc_wq:
 	ipa_svc_workqueue = NULL;
 	vfree(ipa_qmi_ctx);
 	ipa_qmi_ctx = NULL;
-	return;
 }
 
 int ipa_qmi_service_init(uint32_t wan_platform_type)
