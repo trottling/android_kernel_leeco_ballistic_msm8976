@@ -855,11 +855,10 @@ static void ipa_cleanup_deregister_intf(void)
 					mux_channel[i].vchannel_name,
 					i);
 				return;
-			} else {
-				IPAWANDBG("de-register device %s(%d) success\n",
+			}
+			IPAWANDBG("de-register device %s(%d) success\n",
 					mux_channel[i].vchannel_name,
 					i);
-			}
 		}
 		mux_channel[i].ul_flt_reg = false;
 	}
@@ -880,9 +879,8 @@ int wwan_update_mux_channel_prop(void)
 				if (ret) {
 					IPAWANERR("failed to del old rules\n");
 					return -EINVAL;
-				} else {
-					IPAWANDBG("deleted old UL rules\n");
 				}
+				IPAWANDBG("deleted old UL rules\n");
 			}
 			ret = wwan_add_ul_flt_rule_to_ipa();
 		}
@@ -1117,7 +1115,6 @@ static void apps_ipa_tx_complete_notify(void *priv,
 	dev_kfree_skb_any(skb);
 	ipa_rm_inactivity_timer_release_resource(
 		IPA_RM_RESOURCE_WWAN_0_PROD);
-	return;
 }
 
 /**
@@ -1159,7 +1156,6 @@ static void apps_ipa_packet_receive_notify(void *priv,
 	}
 	dev->stats.rx_packets++;
 	dev->stats.rx_bytes += packet_len;
-	return;
 }
 
 /**
@@ -1204,7 +1200,6 @@ static int ipa_wwan_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	/*  Set QoS header enabled  */
 	case RMNET_IOCTL_SET_QOS_ENABLE:
 		return -EINVAL;
-		break;
 	/*  Set QoS header disabled  */
 	case RMNET_IOCTL_SET_QOS_DISABLE:
 		break;
@@ -1662,6 +1657,7 @@ static int q6_rm_request_resource(void)
 static void q6_prod_rm_release_resource(struct work_struct *work)
 {
 	int ret = 0;
+
 	ret = ipa_rm_release_resource(IPA_RM_RESOURCE_Q6_PROD);
 	if (ret < 0 && ret != -EINPROGRESS) {
 		IPAWANERR("%s: ipa_rm_release_resource failed %d\n", __func__,
@@ -2004,7 +2000,7 @@ static int ipa_wwan_probe(struct platform_device *pdev)
 		goto set_perf_err;
 	}
 
-	IPAWANDBG("IPA-WWAN devices (%s) initilization ok :>>>>\n",
+	IPAWANDBG("IPA-WWAN devices (%s) initialization ok :>>>>\n",
 			ipa_netdevs[0]->name);
 	if (ret) {
 		IPAWANERR("default configuration failed rc=%d\n",
@@ -2148,7 +2144,7 @@ static int rmnet_ipa_ap_suspend(struct device *dev)
 * operation is invoked.
 *
 * Enables the network interface queue and returns success to the
-* runtime_pm framwork.
+* runtime_pm framework.
 */
 static int rmnet_ipa_ap_resume(struct device *dev)
 {
