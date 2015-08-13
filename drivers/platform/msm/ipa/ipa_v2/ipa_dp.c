@@ -237,7 +237,6 @@ static void ipa_tx_switch_to_intr_mode(struct ipa_sys_context *sys)
 fail:
 	queue_delayed_work(sys->wq, &sys->switch_to_intr_work,
 			msecs_to_jiffies(1));
-	return;
 }
 
 static void ipa_handle_tx(struct ipa_sys_context *sys)
@@ -264,7 +263,9 @@ static void ipa_handle_tx(struct ipa_sys_context *sys)
 static void ipa_wq_handle_tx(struct work_struct *work)
 {
 	struct ipa_sys_context *sys;
+
 	sys = container_of(work, struct ipa_sys_context, work);
+
 	ipa_handle_tx(sys);
 }
 
@@ -671,7 +672,7 @@ static void ipa_sps_irq_tx_notify(struct sps_event_notify *notify)
 		}
 		break;
 	default:
-		IPAERR("recieved unexpected event id %d\n", notify->event_id);
+		IPAERR("received unexpected event id %d\n", notify->event_id);
 	}
 }
 
@@ -698,7 +699,7 @@ static void ipa_sps_irq_tx_no_aggr_notify(struct sps_event_notify *notify)
 		queue_work(tx_pkt->sys->wq, &tx_pkt->work);
 		break;
 	default:
-		IPAERR("recieved unexpected event id %d\n", notify->event_id);
+		IPAERR("received unexpected event id %d\n", notify->event_id);
 	}
 }
 
@@ -938,7 +939,7 @@ static void ipa_sps_irq_rx_notify(struct sps_event_notify *notify)
 		}
 		break;
 	default:
-		IPAERR("recieved unexpected event id %d\n", notify->event_id);
+		IPAERR("received unexpected event id %d\n", notify->event_id);
 	}
 }
 
@@ -946,6 +947,7 @@ static void switch_to_intr_tx_work_func(struct work_struct *work)
 {
 	struct delayed_work *dwork;
 	struct ipa_sys_context *sys;
+
 	dwork = container_of(work, struct delayed_work, work);
 	sys = container_of(dwork, struct ipa_sys_context, switch_to_intr_work);
 	ipa_handle_tx(sys);
@@ -984,6 +986,7 @@ static void switch_to_intr_rx_work_func(struct work_struct *work)
 {
 	struct delayed_work *dwork;
 	struct ipa_sys_context *sys;
+
 	dwork = container_of(work, struct delayed_work, work);
 	sys = container_of(dwork, struct ipa_sys_context, switch_to_intr_work);
 	ipa_handle_rx(sys);
@@ -1363,7 +1366,7 @@ int ipa_teardown_sys_pipe(u32 clnt_hdl)
 			empty = list_empty(&ep->sys->head_desc_list);
 			spin_unlock_bh(&ep->sys->spinlock);
 			if (!empty)
-				usleep(100);
+				usleep_range(95, 105);
 			else
 				break;
 		} while (1);
@@ -1587,6 +1590,7 @@ EXPORT_SYMBOL(ipa_tx_dp);
 static void ipa_wq_handle_rx(struct work_struct *work)
 {
 	struct ipa_sys_context *sys;
+
 	sys = container_of(work, struct ipa_sys_context, work);
 	ipa_handle_rx(sys);
 }
@@ -1681,8 +1685,7 @@ static void ipa_replenish_wlan_rx_cache(struct ipa_sys_context *sys)
 
 	if (rx_len_cached < sys->rx_pool_sz) {
 		list_for_each_entry_safe(rx_pkt, tmp,
-			&ipa_ctx->wc_memb.wlan_comm_desc_list, link)
-		{
+			&ipa_ctx->wc_memb.wlan_comm_desc_list, link) {
 			list_del(&rx_pkt->link);
 
 			if (ipa_ctx->wc_memb.wlan_comm_free_cnt > 0)
@@ -1725,8 +1728,6 @@ static void ipa_replenish_wlan_rx_cache(struct ipa_sys_context *sys)
 fail_sps_transfer:
 	list_del(&rx_pkt->link);
 	spin_unlock_bh(&ipa_ctx->wc_memb.wlan_spinlock);
-
-	return;
 }
 
 static void ipa_cleanup_wlan_rx_common_cache(void)
@@ -1943,14 +1944,13 @@ static void ipa_fast_replenish_rx_cache(struct ipa_sys_context *sys)
 		queue_delayed_work(sys->wq, &sys->replenish_rx_work,
 			msecs_to_jiffies(1));
 	}
-
-	return;
 }
 
 static void replenish_rx_work_func(struct work_struct *work)
 {
 	struct delayed_work *dwork;
 	struct ipa_sys_context *sys;
+
 	dwork = container_of(work, struct delayed_work, work);
 	sys = container_of(dwork, struct ipa_sys_context, replenish_rx_work);
 	ipa_inc_client_enable_clks();
@@ -2115,6 +2115,7 @@ begin:
 		}
 		if (status->status_mask & IPA_HW_PKT_STATUS_MASK_TAG_VALID) {
 			struct ipa_tag_completion *comp;
+
 			IPADBG("TAG packet arrived\n");
 			if (status->tag_f_2 == IPA_COOKIE) {
 				skb_pull(skb, IPA_PKT_STATUS_SIZE);
@@ -2620,7 +2621,7 @@ static void ipa_dma_memcpy_notify(struct ipa_sys_context *sys,
 		return;
 	}
 	if (!(iovec->flags & SPS_IOVEC_FLAG_EOT)) {
-		IPAERR("recieved unexpected event. sps flag is 0x%x\n"
+		IPAERR("received unexpected event. sps flag is 0x%x\n"
 			, iovec->flags);
 		WARN_ON(1);
 		return;
@@ -2665,7 +2666,7 @@ void ipa_sps_irq_rx_no_aggr_notify(struct sps_event_notify *notify)
 		queue_work(rx_pkt->sys->wq, &rx_pkt->work);
 		break;
 	default:
-		IPAERR("recieved unexpected event id %d sys=%p\n",
+		IPAERR("received unexpected event id %d sys=%p\n",
 				notify->event_id, notify->user);
 	}
 }
