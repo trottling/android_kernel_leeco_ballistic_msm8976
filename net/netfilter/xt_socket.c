@@ -182,9 +182,12 @@ xt_socket_get4_sk(const struct sk_buff *skb, struct xt_action_param *par)
 	}
 #endif
 
-	sk = xt_socket_get_sock_v4(dev_net(skb->dev), protocol,
-				   saddr, daddr, sport, dport,
-				   par->in);
+	if (sk)
+		atomic_inc(&sk->sk_refcnt);
+	else
+		sk = xt_socket_get_sock_v4(dev_net(skb->dev), protocol,
+					   saddr, daddr, sport, dport,
+					   par->in);
 
 	pr_debug("proto %hhu %pI4:%hu -> %pI4:%hu (orig %pI4:%hu) sock %p\n",
 		 protocol, &saddr, ntohs(sport),
@@ -226,8 +229,7 @@ socket_match(const struct sk_buff *skb, struct xt_action_param *par,
 		    transparent && sk_fullsock(sk))
 			pskb->mark = sk->sk_mark;
 
-		if (sk != skb->sk)
-			sock_gen_put(sk);
+		sock_gen_put(sk);
 
 		if (wildcard || !transparent)
 			sk = NULL;
@@ -362,9 +364,12 @@ xt_socket_get6_sk(const struct sk_buff *skb, struct xt_action_param *par)
 		return NULL;
 	}
 
-	sk = xt_socket_get_sock_v6(dev_net(skb->dev), tproto,
-				   saddr, daddr, sport, dport,
-				   par->in);
+	if (sk)
+		atomic_inc(&sk->sk_refcnt);
+	else
+		sk = xt_socket_get_sock_v6(dev_net(skb->dev), tproto,
+					   saddr, daddr, sport, dport,
+					   par->in);
 
 	pr_debug("proto %hhd %pI6:%hu -> %pI6:%hu "
 		 "(orig %pI6:%hu) sock %p\n",
