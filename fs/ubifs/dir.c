@@ -447,6 +447,9 @@ static int ubifs_readdir(struct file *file, struct dir_context *ctx)
 	}
 
 out:
+	kfree(file->private_data);
+	file->private_data = NULL;
+
 	if (err != -ENOENT)
 		ubifs_err("cannot find next direntry, error %d", err);
 	else
@@ -457,8 +460,6 @@ out:
 		 */
 		err = 0;
 
-	kfree(file->private_data);
-	file->private_data = NULL;
 	/* 2 is a special value indicating that there are no more direntries */
 	ctx->pos = 2;
 	return err;
