@@ -166,7 +166,7 @@ struct bpf_prog *bpf_prog_get(u32 ufd);
 void bpf_prog_put(struct bpf_prog *prog);
 void bpf_prog_put_rcu(struct bpf_prog *prog);
 
-struct bpf_map *bpf_map_get(struct fd f);
+struct bpf_map *__bpf_map_get(struct fd f);
 void bpf_map_put(struct bpf_map *map);
 
 /* verify correctness of eBPF program */
