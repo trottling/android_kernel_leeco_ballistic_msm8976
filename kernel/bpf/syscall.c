@@ -109,6 +109,12 @@ static const struct file_operations bpf_map_fops = {
 	.release = bpf_map_release,
 };
 
+static int bpf_map_new_fd(struct bpf_map *map)
+{
+	return anon_inode_getfd("bpf-map", &bpf_map_fops, map,
+				O_RDWR | O_CLOEXEC);
+}
+
 /* helper macro to check that unused fields 'union bpf_attr' are zero */
 #define CHECK_ATTR(CMD) \
 	memchr_inv((void *) &attr->CMD##_LAST_FIELD + \
@@ -139,8 +145,7 @@ static int map_create(union bpf_attr *attr)
 	if (err)
 		goto free_map_nouncharge;
 
-	err = anon_inode_getfd("bpf-map", &bpf_map_fops, map, O_RDWR | O_CLOEXEC);
-
+	err = bpf_map_new_fd(map);
 	if (err < 0)
 		/* failed to allocate fd */
 		goto free_map;
@@ -534,6 +539,12 @@ static const struct file_operations bpf_prog_fops = {
         .release = bpf_prog_release,
 };
 
+static int bpf_prog_new_fd(struct bpf_prog *prog)
+{
+	return anon_inode_getfd("bpf-prog", &bpf_prog_fops, prog,
+				O_RDWR | O_CLOEXEC);
+}
+
 static struct bpf_prog *get_prog(struct fd f)
 {
 	struct bpf_prog *prog;
@@ -640,7 +651,7 @@ static int bpf_prog_load(union bpf_attr *attr)
 	if (err < 0)
 		goto free_used_maps;
 
-	err = anon_inode_getfd("bpf-prog", &bpf_prog_fops, prog, O_RDWR | O_CLOEXEC);
+	err = bpf_prog_new_fd(prog);
 	if (err < 0)
 		/* failed to allocate fd */
 		goto free_used_maps;
