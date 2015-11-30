@@ -209,7 +209,7 @@ static int map_lookup_elem(union bpf_attr *attr)
 		goto free_key;
 
 	err = -ENOMEM;
-	value = kmalloc(map->value_size, GFP_USER);
+	value = kmalloc(map->value_size, GFP_USER | __GFP_NOWARN);
 	if (!value)
 		goto free_key;
 
@@ -268,7 +268,7 @@ static int map_update_elem(union bpf_attr *attr)
 		goto free_key;
 
 	err = -ENOMEM;
-	value = kmalloc(map->value_size, GFP_USER);
+	value = kmalloc(map->value_size, GFP_USER | __GFP_NOWARN);
 	if (!value)
 		goto free_key;
 
