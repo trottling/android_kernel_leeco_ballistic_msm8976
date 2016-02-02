@@ -89,6 +89,22 @@ size_t get_cal_info_size(int32_t cal_type)
 	case AFE_FB_SPKR_PROT_CAL_TYPE:
 		size = sizeof(struct audio_cal_info_spk_prot_cfg);
 		break;
+	case AFE_FB_SPKR_PROT_TH_VI_CAL_TYPE:
+		/*
+		 * Since get and set parameter structures are different in size
+		 * use the maximum size of get and set parameter structure
+		 */
+		size = max(sizeof(struct audio_cal_info_sp_th_vi_ftm_cfg),
+			   sizeof(struct audio_cal_info_sp_th_vi_param));
+		break;
+	case AFE_FB_SPKR_PROT_EX_VI_CAL_TYPE:
+		/*
+		 * Since get and set parameter structures are different in size
+		 * use the maximum size of get and set parameter structure
+		 */
+		size = max(sizeof(struct audio_cal_info_sp_ex_vi_ftm_cfg),
+			   sizeof(struct audio_cal_info_sp_ex_vi_param));
+		break;
 	case AFE_ANC_CAL_TYPE:
 		size = 0;
 		break;
@@ -214,6 +230,22 @@ size_t get_user_cal_type_size(int32_t cal_type)
 		break;
 	case AFE_FB_SPKR_PROT_CAL_TYPE:
 		size = sizeof(struct audio_cal_type_fb_spk_prot_cfg);
+		break;
+	case AFE_FB_SPKR_PROT_TH_VI_CAL_TYPE:
+		/*
+		 * Since get and set parameter structures are different in size
+		 * use the maximum size of get and set parameter structure
+		 */
+		size = max(sizeof(struct audio_cal_type_sp_th_vi_ftm_cfg),
+			   sizeof(struct audio_cal_type_sp_th_vi_param));
+		break;
+	case AFE_FB_SPKR_PROT_EX_VI_CAL_TYPE:
+		/*
+		 * Since get and set parameter structures are different in size
+		 * use the maximum size of get and set parameter structure
+		 */
+		size = max(sizeof(struct audio_cal_type_sp_ex_vi_ftm_cfg),
+			   sizeof(struct audio_cal_type_sp_ex_vi_param));
 		break;
 	case AFE_ANC_CAL_TYPE:
 		size = 0;
