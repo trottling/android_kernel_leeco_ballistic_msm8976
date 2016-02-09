@@ -141,7 +141,7 @@ static int table_extract_mpi_array(struct public_key_signature *pks,
 }
 
 static struct public_key_signature *table_make_digest(
-						enum pkey_hash_algo hash,
+						enum hash_algo hash,
 						const void *table,
 						unsigned long table_len)
 {
@@ -154,7 +154,7 @@ static struct public_key_signature *table_make_digest(
 	/* Allocate the hashing algorithm we're going to need and find out how
 	 * big the hash operational data will be.
 	 */
-	tfm = crypto_alloc_shash(pkey_hash_algo[hash], 0, 0);
+	tfm = crypto_alloc_shash(hash_algo_name[hash], 0, 0);
 	if (IS_ERR(tfm))
 		return ERR_CAST(tfm);
 
@@ -588,7 +588,7 @@ static int verify_verity_signature(char *key_id,
 
 	key = key_ref_to_ptr(key_ref);
 
-	pks = table_make_digest(PKEY_HASH_SHA256,
+	pks = table_make_digest(HASH_ALGO_SHA256,
 			(const void *)metadata->verity_table,
 			le32_to_cpu(metadata->header->table_length));
 
