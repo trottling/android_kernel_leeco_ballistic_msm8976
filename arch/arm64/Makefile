@@ -59,11 +59,14 @@ core-$(CONFIG_CRYPTO) += arch/arm64/crypto/
 libs-y		:= arch/arm64/lib/ $(libs-y)
 libs-y		+= $(LIBGCC)
 
-# Default target when executing plain make
-ifeq ($(CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE),y)
-KBUILD_IMAGE	:= Image.gz-dtb
+ifeq ($(CONFIG_BUILD_ARM64_KERNEL_COMPRESSION_GZIP),y)
+KBUILD_IMAGE   := Image.gz
 else
-KBUILD_IMAGE	:= Image.gz
+KBUILD_IMAGE   := Image
+endif
+
+ifeq ($(CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE),y)
+KBUILD_IMAGE   := $(addsuffix -dtb,$(KBUILD_IMAGE))
 endif
 
 KBUILD_DTBS	:= dtbs
@@ -84,6 +87,9 @@ zinstall install: vmlinux
 dtbs: scripts
 	$(Q)$(MAKE) $(build)=$(boot)/dts dtbs
 	$(Q)$(MAKE) $(build)=$(boot)/dts/qcom dtbs
+
+Image-dtb: vmlinux scripts dtbs
+	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
 
 PHONY += vdso_install
 vdso_install:
