@@ -137,7 +137,7 @@ static int map_create(union bpf_attr *attr)
 
 	err = bpf_map_charge_memlock(map);
 	if (err)
-		goto free_map;
+		goto free_map_nouncharge;
 
 	err = anon_inode_getfd("bpf-map", &bpf_map_fops, map, O_RDWR | O_CLOEXEC);
 
@@ -148,6 +148,8 @@ static int map_create(union bpf_attr *attr)
 	return err;
 
 free_map:
+	bpf_map_uncharge_memlock(map);
+free_map_nouncharge:
 	map->ops->map_free(map);
 	return err;
 }
