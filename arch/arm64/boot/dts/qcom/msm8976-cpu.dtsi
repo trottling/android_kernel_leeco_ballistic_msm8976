@@ -57,6 +57,7 @@
 			device_type = "cpu";
 			compatible = "arm,cortex-a53","arm,armv8";
 			reg = <0x0>;
+			clock-frequency = <1401600000>;
 			enable-method = "psci";
 			efficiency = <1024>;
 			sched-energy-costs = <&CPU_COST_0 &CLUSTER_COST_0>;
@@ -83,6 +84,7 @@
 			device_type = "cpu";
 			compatible = "arm,cortex-a53","arm,armv8";
 			reg = <0x1>;
+			clock-frequency = <1401600000>;
 			enable-method = "psci";
 			efficiency = <1024>;
 			sched-energy-costs = <&CPU_COST_0 &CLUSTER_COST_0>;
@@ -102,6 +104,7 @@
 			device_type = "cpu";
 			compatible = "arm,cortex-a53","arm,armv8";
 			reg = <0x2>;
+			clock-frequency = <1401600000>;
 			enable-method = "psci";
 			efficiency = <1024>;
 			sched-energy-costs = <&CPU_COST_0 &CLUSTER_COST_0>;
@@ -121,6 +124,7 @@
 			device_type = "cpu";
 			compatible = "arm,cortex-a53","arm,armv8";
 			reg = <0x3>;
+			clock-frequency = <1401600000>;
 			enable-method = "psci";
 			efficiency = <1024>;
 			sched-energy-costs = <&CPU_COST_0 &CLUSTER_COST_0>;
@@ -140,6 +144,7 @@
 			device_type = "cpu";
 			compatible = "arm,armv8";
 			reg = <0x100>;
+			clock-frequency = <1804800000>;
 			enable-method = "psci";
 			efficiency = <1830>;
 			sched-energy-costs = <&CPU_COST_1 &CLUSTER_COST_1>;
@@ -166,6 +171,7 @@
 			device_type = "cpu";
 			compatible = "arm,armv8";
 			reg = <0x101>;
+			clock-frequency = <1804800000>;
 			enable-method = "psci";
 			efficiency = <1830>;
 			sched-energy-costs = <&CPU_COST_1 &CLUSTER_COST_1>;
@@ -185,6 +191,7 @@
 			device_type = "cpu";
 			compatible = "arm,armv8";
 			reg = <0x102>;
+			clock-frequency = <1804800000>;
 			enable-method = "psci";
 			efficiency = <1830>;
 			sched-energy-costs = <&CPU_COST_1 &CLUSTER_COST_1>;
@@ -204,6 +211,7 @@
 			device_type = "cpu";
 			compatible = "arm,armv8";
 			reg = <0x103>;
+			clock-frequency = <1804800000>;
 			enable-method = "psci";
 			efficiency = <1830>;
 			sched-energy-costs = <&CPU_COST_1 &CLUSTER_COST_1>;
