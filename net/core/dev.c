@@ -3915,9 +3915,6 @@ static enum gro_result dev_gro_receive(struct napi_struct *napi, struct sk_buff 
 	if (!(skb->dev->features & NETIF_F_GRO) || netpoll_rx_on(skb))
 		goto normal;
 
-	if (skb->csum_bad)
-		goto normal;
-
 	gro_list_prepare(napi, skb);
 
 	if (skb->ip_summed == CHECKSUM_COMPLETE) {
