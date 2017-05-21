@@ -922,4 +922,14 @@ config PON_SOMC_ORG
 	help
 	  This option enables SoMC specific power on interface.
 
+config INPUT_DRV2604L_HAPTICS
+	tristate "drv2604L sensor driver"
+	depends on I2C
+	default n
+	help
+	Say Y here if you want to enable the drv2604L ecompass sensor
+	driver.
+	To compile this driver as a module, choose M here: the
+	module will be called drv2604l.
+
 endif
