@@ -108,3 +108,5 @@ obj-$(CONFIG_GPIO_XTENSA)	+= gpio-xtensa.o
 obj-$(CONFIG_GPIO_ZEVIO)	+= gpio-zevio.o
 obj-$(CONFIG_GPIO_ZYNQ)		+= gpio-zynq.o
 obj-$(CONFIG_MSM_SMP2P)         += gpio-msm-smp2p.o
+
+obj-$(CONFIG_INFRARED_MAXQ656)		+= maxq656/
