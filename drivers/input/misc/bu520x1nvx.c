@@ -1,5 +1,7 @@
 /* drivers/input/misc/bu520x1nvx.c
  *
+ * Copyright (C) 2017 Sony Mobile Communications Inc.
+ *
  * Author: Takashi Shiina <takashi.shiina@sonymobile.com>
  *         Tadashi Kubo <tadashi.kubo@sonymobile.com>
  *         Shogo Tanaka <shogo.tanaka@sonymobile.com>
@@ -9,13 +11,6 @@
  * it under the terms of the GNU General Public License version 2, as
  * published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
- */
-/*
- * Copyright (C) 2015 Sony Mobile Communications Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2, as
- * published by the Free Software Foundation.
  */
 
 #include <linux/delay.h>
@@ -32,13 +27,11 @@
 #include <linux/platform_device.h>
 #include <linux/pm.h>
 #include <linux/slab.h>
-#include <linux/switch.h>
 #include <linux/types.h>
 
 #define BU520X1NVX_DEV_NAME "bu520x1nvx"
-#define BU520X1NVX_SW_LID_NAME "lid"
-#define BU520X1NVX_SW_KEYDOCK_NAME "keyboard_dock"
-#define BU520X1NVX_SWITCH_NUM 2
+
+#define LID_DEVPATH "DEVPATH=/devices/virtual/switch/lid"
 
 struct bu520x1nvx_event_data {
 	const struct bu520x1nvx_gpio_event *event;
@@ -51,8 +44,7 @@ struct bu520x1nvx_drvdata {
 	struct device *dev;
 	struct pinctrl *key_pinctrl;
 	struct input_dev *input_dev;
-	struct switch_dev switch_lid;
-	struct switch_dev switch_keydock;
+	int input_lid_state;
 	struct mutex lock;
 	atomic_t detection_in_progress;
 	unsigned int n_events;
@@ -80,20 +72,16 @@ static void bu520x1nvx_report_input_event(struct input_dev *idev,
 				 const struct bu520x1nvx_gpio_event *event)
 {
 	int gpio_state = bu520x1nvx_get_lid_state(event);
+	char *input_event[3];
+	char buf[32] = {0};
 	dev_dbg(&idev->dev, "%s: value(%d)\n", __func__, gpio_state);
 	input_report_switch(idev, SW_LID, gpio_state);
 	input_sync(idev);
-}
-
-static void bu520x1nvx_report_switch_event(struct switch_dev *switch_dev,
-				 const struct bu520x1nvx_gpio_event *event)
-{
-	int gpio_state = (gpio_get_value_cansleep(event->gpio)
-						  ^ event->active_low ?
-						  SWITCH_ON : SWITCH_OFF);
-
-	dev_dbg(switch_dev->dev, "%s: value(%d)\n", __func__, gpio_state);
-	switch_set_state(switch_dev, gpio_state);
+	snprintf(buf, sizeof(buf), "SWITCH_STATE=%d", gpio_state);
+	input_event[0] = buf;
+	input_event[1] = LID_DEVPATH;
+	input_event[2] = NULL;
+	kobject_uevent_env(&idev->dev.kobj, KOBJ_CHANGE, input_event);
 }
 
 static int bu520x1nvx_get_devtree(struct device *dev,
@@ -217,10 +205,8 @@ static void bu520x1nvx_det_work(struct work_struct *work)
 						data[!event->lid_pin]);
 
 	if (event->lid_pin) {
-		bu520x1nvx_report_switch_event(&ddata->switch_lid, event);
+		ddata->input_lid_state = bu520x1nvx_get_lid_state(event);
 		bu520x1nvx_report_input_event(ddata->input_dev, event);
-	} else {
-		bu520x1nvx_report_switch_event(&ddata->switch_keydock, event);
 	}
 
 	atomic_set(&ddata->detection_in_progress, 0);
@@ -393,46 +379,27 @@ out:
 
 }
 
-static int bu520x1nvx_set_switch_device(struct bu520x1nvx_drvdata *ddata,
-					bool lid_pin)
+static ssize_t bu520x1nvx_show_lid_state(struct device *dev,
+		struct device_attribute *attr, char *buf)
 {
-	int error = 0;
+	struct bu520x1nvx_drvdata *ddata;
 
-	if (lid_pin) {
-		ddata->switch_lid.name = BU520X1NVX_SW_LID_NAME;
-		ddata->switch_lid.state = SWITCH_OFF;
-		error = switch_dev_register(&ddata->switch_lid);
-		if (error) {
-			dev_err(ddata->dev, "%s cannot regist lid(%d)\n",
-				__func__, error);
-			goto out;
-		}
-	} else {
-		ddata->switch_keydock.name = BU520X1NVX_SW_KEYDOCK_NAME;
-		ddata->switch_keydock.state = SWITCH_OFF;
-		error = switch_dev_register(&ddata->switch_keydock);
-		if (error) {
-			dev_err(ddata->dev, "%s cannot regist keydock(%d)\n",
-				__func__, error);
-			goto fail_switch;
-		}
-	}
-	goto out;
+	ddata = dev_get_drvdata(dev);
 
-fail_switch:
-	switch_dev_unregister(&ddata->switch_lid);
-out:
-	return error;
+	return snprintf(buf, PAGE_SIZE, "%d\n", ddata->input_lid_state);
 }
+
+static struct device_attribute bu520x1nvx_attrs[] = {
+	__ATTR(state, S_IRUGO, bu520x1nvx_show_lid_state, NULL),
+};
 
 static int bu520x1nvx_probe(struct platform_device *pdev)
 {
 	struct bu520x1nvx_platform_data *pdata = pdev->dev.platform_data;
 	struct bu520x1nvx_platform_data alt_pdata;
-	const struct bu520x1nvx_gpio_event *event;
+	const struct bu520x1nvx_gpio_event *event = NULL;
 	struct bu520x1nvx_event_data *edata;
 	struct bu520x1nvx_drvdata *ddata;
-	struct switch_dev *switch_dev;
 	int i = 0;
 	int error = 0;
 	struct pinctrl_state *set_state;
@@ -489,14 +456,6 @@ static int bu520x1nvx_probe(struct platform_device *pdev)
 				goto fail_setup_event;
 			}
 		}
-
-		error = bu520x1nvx_set_switch_device(ddata, event->lid_pin);
-		if (error) {
-			dev_err(ddata->dev, "%s cannot set switch dev(%d)\n",
-				__func__, error);
-			goto fail_setup_event;
-		}
-
 		error = bu520x1nvx_setup_event(pdev, edata, event);
 		if (error) {
 			dev_err(ddata->dev, "%s cannot set event error(%d)\n",
@@ -504,25 +463,21 @@ static int bu520x1nvx_probe(struct platform_device *pdev)
 			goto fail_setup_event;
 		}
 
-		if (event->lid_pin)
-			switch_dev = &ddata->switch_lid;
-		else
-			switch_dev = &ddata->switch_keydock;
-
-		bu520x1nvx_report_switch_event(switch_dev, event);
 	}
+
+	error = device_create_file(ddata->dev, bu520x1nvx_attrs);
+	if (error) {
+		dev_err(&pdev->dev, "create_file failed\n");
+		goto fail_setup_event;
+	}
+	ddata->input_lid_state = bu520x1nvx_get_lid_state(event);
+	bu520x1nvx_report_input_event(ddata->input_dev, event);
 
 	return 0;
 
 fail_setup_event:
-	if (ddata->switch_lid.dev)
-		switch_dev_unregister(&ddata->switch_lid);
-	if (ddata->switch_keydock.dev)
-		switch_dev_unregister(&ddata->switch_keydock);
-	if (&ddata->input_dev->dev) {
-		input_unregister_device(ddata->input_dev);
-		input_free_device(ddata->input_dev);
-	}
+	input_unregister_device(ddata->input_dev);
+	input_free_device(ddata->input_dev);
 	if (ddata->key_pinctrl) {
 		set_state =
 		pinctrl_lookup_state(ddata->key_pinctrl,
@@ -546,13 +501,7 @@ static int bu520x1nvx_remove(struct platform_device *pdev)
 {
 	int i;
 	struct bu520x1nvx_drvdata *ddata = platform_get_drvdata(pdev);
-
-	if (ddata->switch_lid.dev)
-		switch_dev_unregister(&ddata->switch_lid);
-	if (ddata->switch_keydock.dev)
-		switch_dev_unregister(&ddata->switch_keydock);
-	if (&ddata->input_dev->dev)
-		input_unregister_device(ddata->input_dev);
+	input_unregister_device(ddata->input_dev);
 	mutex_destroy(&ddata->lock);
 	for (i = 0; i < ddata->n_events; i++)
 		bu520x1nvx_remove_event(&ddata->data[i]);
@@ -620,4 +569,4 @@ static struct platform_driver bu520x1nvx_driver = {
 
 module_platform_driver(bu520x1nvx_driver);
 
-MODULE_LICENSE("GPLv2");
+MODULE_LICENSE("GPL v2");
