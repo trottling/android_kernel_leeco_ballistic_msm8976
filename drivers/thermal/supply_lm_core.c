@@ -922,7 +922,7 @@ static unsigned int get_voltage_from_opp(struct device *dev,
 					unsigned int *volt_id)
 {
 	int ret = 0;
-	struct opp *opp = NULL;
+	struct dev_pm_opp *opp = NULL;
 
 	rcu_read_lock();
 	opp = dev_pm_opp_find_freq_exact(dev, freq, true);
