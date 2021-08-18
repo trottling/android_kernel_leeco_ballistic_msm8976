@@ -226,7 +226,6 @@ obj-$(CONFIG_AUDIO_EXT_CLK)	+= audio-ext-clock.o
 obj-$(CONFIG_SND_SOC_WCD9XXX)   += snd-soc-wcd9xxx.o
 obj-$(CONFIG_SND_SOC_MSM8X16_WCD)	+= snd-soc-msm8x16-wcd.o msm8916-wcd-irq.o
 obj-$(CONFIG_SND_SOC_WCD_MBHC)  += snd-soc-wcd-mbhc.o
-obj-$(CONFIG_SND_SOC_WCD_CPE) += snd-soc-wcd-cpe.o
 obj-$(CONFIG_SND_SOC_MSM8909_WCD)	+= snd-soc-msm8909-wcd.o msm8916-wcd-irq.o
 obj-$(CONFIG_SND_SOC_WSA881X)	+= snd-soc-wsa881x-analog.o
 obj-$(CONFIG_SND_SOC_WSA881X)	+= snd-soc-wsa881x.o
