@@ -15,7 +15,6 @@
 #define __MACH_370_XP_COHERENCY_H
 
 int set_cpu_coherent(int cpu_id, int smp_group_id);
-int coherency_available(void);
 int coherency_init(void);
 
 #endif	/* __MACH_370_XP_COHERENCY_H */
