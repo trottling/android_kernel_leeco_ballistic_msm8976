@@ -82,6 +82,7 @@ static unsigned int *msm_mpm_irqs_m2a;
 #define hashfn(val) (val % num_mpm_irqs)
 #define SCLK_HZ (32768)
 #define ARCH_TIMER_HZ (19200000)
+#define MAX_IRQ 1024
 
 struct msm_mpm_device_data {
 	uint16_t *irqs_m2a;
@@ -710,7 +711,7 @@ static int msm_mpm_dev_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	dev->mpm_request_reg_base = devm_request_and_ioremap(&pdev->dev, res);
+	dev->mpm_request_reg_base = devm_ioremap_resource(&pdev->dev, res);
 
 	if (!dev->mpm_request_reg_base) {
 		pr_err("%s(): Unable to iomap\n", __func__);
@@ -783,14 +784,9 @@ static int msm_mpm_dev_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static inline int __init mpm_irq_domain_linear_size(struct irq_domain *d)
+static inline int __init mpm_irq_domain_size(struct irq_domain *d)
 {
-	return d->revmap_data.linear.size;
-}
-
-static inline int __init mpm_irq_domain_legacy_size(struct irq_domain *d)
-{
-	return d->revmap_data.legacy.size;
+	return d->revmap_size ?: MAX_IRQ;
 }
 
 static const struct mpm_of mpm_of_map[MSM_MPM_NR_IRQ_DOMAINS] = {
@@ -799,7 +795,7 @@ static const struct mpm_of mpm_of_map[MSM_MPM_NR_IRQ_DOMAINS] = {
 		"qcom,gic-map",
 		"gic",
 		&gic_arch_extn,
-		mpm_irq_domain_linear_size,
+		mpm_irq_domain_size,
 	},
 	{
 		"qcom,gpio-parent",
@@ -810,9 +806,9 @@ static const struct mpm_of mpm_of_map[MSM_MPM_NR_IRQ_DOMAINS] = {
 #elif defined(CONFIG_GPIO_MSM_V3)
 		&msm_gpio_irq_extn,
 #else
-		NULL,
+		&mpm_pinctrl_extn,
 #endif
-		mpm_irq_domain_legacy_size,
+		mpm_irq_domain_size,
 	},
 };
 
