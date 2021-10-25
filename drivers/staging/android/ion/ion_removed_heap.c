@@ -49,8 +49,7 @@ ion_phys_addr_t ion_removed_allocate(struct ion_heap *heap,
 {
 	struct ion_removed_heap *removed_heap =
 		container_of(heap, struct ion_removed_heap, heap);
-	unsigned long offset = gen_pool_alloc_aligned(removed_heap->pool,
-							size, ilog2(align));
+	unsigned long offset = gen_pool_alloc(removed_heap->pool, size);
 
 	if (!offset) {
 		if ((removed_heap->total_size -
