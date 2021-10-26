@@ -189,7 +189,6 @@ enum msm_cpu {
 struct msm_soc_info {
 	enum msm_cpu generic_soc_type;
 	char *soc_id_string;
-	char *suffix;
 };
 
 enum pmic_model {
