@@ -362,6 +362,14 @@ config CLD_LL_CORE
 	---help---
 	  Core driver for the Qualcomm QCA6174 Chipset
 
+config CNSS_CRYPTO
+	tristate "Enable CNSS crypto support"
+	---help---
+	  Add crypto support for the WLAN  driver module.
+	  This feature enable wlan driver to use the crypto APIs exported
+	  from cnss platform driver. This crypto APIs used to generate cipher
+	  key and add support for the WLAN driver module security protocol.
+
 source "drivers/net/wireless/ath/Kconfig"
 source "drivers/net/wireless/b43/Kconfig"
 source "drivers/net/wireless/b43legacy/Kconfig"
