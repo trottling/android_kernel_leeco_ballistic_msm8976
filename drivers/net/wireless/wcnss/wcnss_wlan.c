@@ -43,8 +43,6 @@
 
 #include <soc/qcom/smd.h>
 
-#include "detect_wcnss_fem.h"
-
 #define DEVICE "wcnss_wlan"
 #define CTRL_DEVICE "wcnss_ctrl"
 #define VERSION "1.01"
@@ -255,9 +253,6 @@ static struct notifier_block wnb = {
 };
 
 #define NVBIN_FILE "wlan/prima/WCNSS_qcom_wlan_nv.bin"
-#ifdef COMPATIBLE_WCNSS_NV
-#define NVBIN_FILE_NOFEM "wlan/prima/WCNSS_qcom_wlan_nv_nofem.bin"
-#endif
 
 /* On SMD channel 4K of maximum data can be transferred, including message
  * header, so NV fragment size as next multiple of 1Kb is 3Kb.
@@ -2355,24 +2350,12 @@ static void wcnss_nvbin_dnld(void)
 
 	down_read(&wcnss_pm_sem);
 
-#ifdef COMPATIBLE_WCNSS_NV
-	if (if_wcnss_with_fem() == WCNSS_WITHOUT_FEM) {
-		ret = request_firmware(&nv, NVBIN_FILE_NOFEM, dev);
-		if (ret || !nv || !nv->data || !nv->size) {
-			pr_err("wcnss: %s: request_firmware failed for %s (ret = %d)\n",
-				__func__, NVBIN_FILE_NOFEM, ret);
-			goto out;
-		}
-	} else
-#endif
-	{
-		ret = request_firmware(&nv, NVBIN_FILE, dev);
+	ret = request_firmware(&nv, NVBIN_FILE, dev);
 
-		if (ret || !nv || !nv->data || !nv->size) {
-			pr_err("wcnss: %s: request_firmware failed for %s (ret = %d)\n",
-				__func__, NVBIN_FILE, ret);
-			goto out;
-		}
+	if (ret || !nv || !nv->data || !nv->size) {
+		pr_err("wcnss: %s: request_firmware failed for %s (ret = %d)\n",
+			__func__, NVBIN_FILE, ret);
+		goto out;
 	}
 
 	/* First 4 bytes in nv blob is validity bitmap.
@@ -3578,9 +3561,6 @@ static struct platform_driver wcnss_wlan_driver = {
 
 static int __init wcnss_wlan_init(void)
 {
-#ifdef COMPATIBLE_WCNSS_NV
-	detect_wcnss_fem();
-#endif
 	platform_driver_register(&wcnss_wlan_driver);
 	platform_driver_register(&wcnss_wlan_ctrl_driver);
 	platform_driver_register(&wcnss_ctrl_driver);
@@ -3603,11 +3583,7 @@ static void __exit wcnss_wlan_exit(void)
 	platform_driver_unregister(&wcnss_wlan_driver);
 }
 
-#ifdef COMPATIBLE_WCNSS_NV
-late_initcall(wcnss_wlan_init);
-#else
 module_init(wcnss_wlan_init);
-#endif
 module_exit(wcnss_wlan_exit);
 
 MODULE_LICENSE("GPL v2");
