@@ -67,7 +67,7 @@
 #define SLIM_MSG_ASM_FIRST_WORD(l, mt, mc, dt, ad) \
 		((l) | ((mt) << 5) | ((mc) << 8) | ((dt) << 15) | ((ad) << 16))
 
-#define INIT_MX_RETRIES 10
+#define INIT_MX_RETRIES 3
 #define DEF_RETRY_MS	10
 #define MSM_CONCUR_MSG	8
 #define SAT_CONCUR_MSG	8
@@ -309,6 +309,7 @@ struct msm_slim_ctrl {
 	void (*rx_slim)(struct msm_slim_ctrl *dev, u8 *buf);
 	u32			current_rx_buf[10];
 	int			current_count;
+	atomic_t		ssr_in_progress;
 };
 
 struct msm_sat_chan {
@@ -371,7 +372,7 @@ enum {
 
 /* warnings and errors show up on console always */
 #define SLIM_WARN(dev, x...) do { \
-	pr_warn_ratelimited(x); \
+	pr_warn(x); \
 	if (dev->ipc_slimbus_log && dev->ipc_log_mask >= WARN_LEV) \
 		ipc_log_string(dev->ipc_slimbus_log, x); \
 } while (0)
@@ -381,7 +382,7 @@ enum {
  * in IPC logging. Further errors continue to log on the console
  */
 #define SLIM_ERR(dev, x...) do { \
-	pr_err_ratelimited(x); \
+	pr_err(x); \
 	if (dev->ipc_slimbus_log && dev->ipc_log_mask >= ERR_LEV) { \
 		ipc_log_string(dev->ipc_slimbus_log, x); \
 		dev->default_ipc_log_mask = dev->ipc_log_mask; \
