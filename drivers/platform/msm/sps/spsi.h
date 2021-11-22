@@ -52,6 +52,8 @@
 #define MAX_MSG_LEN 80
 #define SPS_IPC_LOGPAGES 10
 #define SPS_IPC_REG_DUMP_FACTOR 3
+#define SPS_IPC_DEFAULT_LOGLEVEL 3
+#define SPS_IPC_MAX_LOGLEVEL 4
 
 /* Connection mapping control struct */
 struct sps_rm {
@@ -133,7 +135,7 @@ extern u8 print_limit_option;
 				ipc_log_string((dev)->ipc_log4, \
 					"%s: " msg, __func__, args); \
 			else \
-				pr_err("sps: no such IPC logging index!\n"); \
+				pr_debug("sps: no such IPC logging index!\n"); \
 		} \
 	} while (0)
 #define SPS_DUMP(msg, args...) do {					\
@@ -218,13 +220,13 @@ extern u8 print_limit_option;
 		}	\
 	} while (0)
 #else
-#define	SPS_DBG3(x...)		pr_debug(x)
-#define	SPS_DBG2(x...)		pr_debug(x)
-#define	SPS_DBG1(x...)		pr_debug(x)
-#define	SPS_DBG(x...)		pr_debug(x)
-#define	SPS_INFO(x...)		pr_info(x)
-#define	SPS_ERR(x...)		pr_err(x)
-#define	SPS_DUMP(x...)		pr_info(x)
+#define SPS_DBG3(dev, msg, args...)             pr_debug(msg, ##args)
+#define SPS_DBG2(dev, msg, args...)             pr_debug(msg, ##args)
+#define SPS_DBG1(dev, msg, args...)             pr_debug(msg, ##args)
+#define SPS_DBG(dev, msg, args...)              pr_debug(msg, ##args)
+#define SPS_INFO(dev, msg, args...)             pr_info(msg, ##args)
+#define SPS_ERR(dev, msg, args...)              pr_err(msg, ##args)
+#define SPS_DUMP(msg, args...)                  pr_info(msg, ##args)
 #endif
 
 /* End point parameters */
