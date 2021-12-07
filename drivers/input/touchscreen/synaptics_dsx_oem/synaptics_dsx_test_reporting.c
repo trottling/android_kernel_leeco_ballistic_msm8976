@@ -190,6 +190,7 @@
 #define FULL_RAW_CAP_MIN_MAX_DATA_SIZE 4
 #define TRX_OPEN_SHORT_DATA_SIZE 7
 #define CALIBRATION_DATA_SIZE 3624
+
 #define concat(a, b) a##b
 
 #define attrify(propname) (&dev_attr_##propname.attr)
@@ -201,7 +202,7 @@ static ssize_t concat(test_sysfs, _##propname##_show)(\
 		char *buf);\
 \
 static struct device_attribute dev_attr_##propname =\
-		__ATTR(propname, S_IRUGO,\
+		__ATTR(propname, 0444,\
 		concat(test_sysfs, _##propname##_show),\
 		synaptics_rmi4_store_error);
 
@@ -212,7 +213,7 @@ static ssize_t concat(test_sysfs, _##propname##_store)(\
 		const char *buf, size_t count);\
 \
 static struct device_attribute dev_attr_##propname =\
-		__ATTR(propname, S_IWUGO,\
+		__ATTR(propname, 0220,\
 		synaptics_rmi4_show_error,\
 		concat(test_sysfs, _##propname##_store));
 
@@ -228,7 +229,7 @@ static ssize_t concat(test_sysfs, _##propname##_store)(\
 		const char *buf, size_t count);\
 \
 static struct device_attribute dev_attr_##propname =\
-		__ATTR(propname, (S_IRUGO | S_IWUGO),\
+		__ATTR(propname, 0664,\
 		concat(test_sysfs, _##propname##_show),\
 		concat(test_sysfs, _##propname##_store));
 

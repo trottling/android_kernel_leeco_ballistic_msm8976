@@ -119,7 +119,6 @@ bool tp_sleep_mode = false;
 #define F12_WAKEUP_GESTURE_MODE 0x02
 #define F12_UDG_DETECT 0x0f
 
-static char *synaptics_sysfs_pathname(struct sysfs_dirent *sd, char *path);
 static int synaptics_rmi4_check_status(struct synaptics_rmi4_data *rmi4_data,
 		bool *was_in_bl_mode);
 static int synaptics_rmi4_free_fingers(struct synaptics_rmi4_data *rmi4_data);
@@ -605,25 +604,25 @@ static struct synaptics_rmi4_exp_fn_data exp_data;
 static struct synaptics_dsx_button_map *vir_button_map;
 
 static struct device_attribute attrs[] = {
-	__ATTR(reset, S_IWUGO,
+	__ATTR(reset, 0220,
 			synaptics_rmi4_show_error,
 			synaptics_rmi4_f01_reset_store),
-	__ATTR(productinfo, S_IRUGO,
+	__ATTR(productinfo, 0444,
 			synaptics_rmi4_f01_productinfo_show,
 			synaptics_rmi4_store_error),
-	__ATTR(buildid, S_IRUGO,
+	__ATTR(buildid, 0444,
 			synaptics_rmi4_f01_buildid_show,
 			synaptics_rmi4_store_error),
-	__ATTR(flashprog, S_IRUGO,
+	__ATTR(flashprog, 0444,
 			synaptics_rmi4_f01_flashprog_show,
 			synaptics_rmi4_store_error),
-	__ATTR(0dbutton, (S_IRUGO | S_IWUGO),
+	__ATTR(0dbutton, 0664,
 			synaptics_rmi4_0dbutton_show,
 			synaptics_rmi4_0dbutton_store),
-	__ATTR(suspend, S_IWUGO,
+	__ATTR(suspend, 0220,
 			synaptics_rmi4_show_error,
 			synaptics_rmi4_suspend_store),
-	__ATTR(wake_gesture, (S_IRUGO | S_IWUGO),
+	__ATTR(wake_gesture, 0664,
 			synaptics_rmi4_wake_gesture_show,
 			synaptics_rmi4_wake_gesture_store),
 };
@@ -631,20 +630,10 @@ struct synaptics_rmi4_data *rmi4_data_truly;
 static struct kobj_attribute virtual_key_map_attr = {
 	.attr = {
 		.name = VIRTUAL_KEY_MAP_FILE_NAME,
-		.mode = S_IRUGO,
+		.mode = 0444,
 	},
 	.show = synaptics_rmi4_virtual_key_map_show,
 };
-
-static char *synaptics_sysfs_pathname(struct sysfs_dirent *sd, char *path)
-{
-	if (sd->s_parent) {
-		synaptics_sysfs_pathname(sd->s_parent, path);
-		strlcat(path, "/", PATH_MAX);
-	}
-	strlcat(path, sd->s_name, PATH_MAX);
-	return path;
-}
 
 static ssize_t synaptics_rmi4_f01_reset_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
@@ -848,8 +837,6 @@ static int synaptics_rmi4_proc_init(struct sysfs_dirent *sysfs_dirent_parent)
 	struct proc_dir_entry *proc_symlink_tmp  = NULL;
 
 	buf = kzalloc(PATH_MAX, GFP_KERNEL);
-	if (buf)
-		path = synaptics_sysfs_pathname(sysfs_dirent_parent, buf);
 
 	proc_entry_tp = proc_mkdir("touchpanel", NULL);
 	if (proc_entry_tp == NULL) {
@@ -860,8 +847,8 @@ static int synaptics_rmi4_proc_init(struct sysfs_dirent *sysfs_dirent_parent)
 	key_disabler_sysfs_node = kzalloc(PATH_MAX, GFP_KERNEL);
 	if (key_disabler_sysfs_node)
 		sprintf(key_disabler_sysfs_node, "/sys%s/%s", path, "0dbutton");
-
-	proc_symlink_tmp = proc_symlink("capacitive_keys_enable", proc_entry_tp, key_disabler_sysfs_node);
+	proc_symlink_tmp = proc_symlink("capacitive_keys_enable",
+			proc_entry_tp, key_disabler_sysfs_node);
 	if (proc_symlink_tmp == NULL) {
 		ret = -ENOMEM;
 		pr_err("%s: Couldn't create capacitive_keys_enable symlink\n", __func__);
