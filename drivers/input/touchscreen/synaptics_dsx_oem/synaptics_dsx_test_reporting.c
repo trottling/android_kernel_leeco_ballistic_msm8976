@@ -203,7 +203,7 @@ static ssize_t concat(test_sysfs, _##propname##_show)(\
 static struct device_attribute dev_attr_##propname =\
 		__ATTR(propname, S_IRUGO,\
 		concat(test_sysfs, _##propname##_show),\
-		synaptics_rmi4_store_error);
+		NULL);
 
 #define store_prototype(propname)\
 static ssize_t concat(test_sysfs, _##propname##_store)(\
