@@ -167,6 +167,7 @@ void fixup_lower_ownership(struct dentry *dentry, const char *name)
 {
 	struct path path;
 	struct inode *inode;
+	struct inode *delegated_inode = NULL;
 	int error;
 	struct sdcardfs_inode_info *info;
 	struct sdcardfs_inode_data *info_d;
@@ -241,7 +242,8 @@ void fixup_lower_ownership(struct dentry *dentry, const char *name)
 
 	sdcardfs_get_lower_path(dentry, &path);
 	inode = path.dentry->d_inode;
-	if (path.dentry->d_inode->i_gid != gid || path.dentry->d_inode->i_uid != uid) {
+	if (path.dentry->d_inode->i_gid.val != gid || path.dentry->d_inode->i_uid.val != uid) {
+retry_deleg:
 		newattrs.ia_valid = ATTR_GID | ATTR_UID | ATTR_FORCE;
 		newattrs.ia_uid = make_kuid(current_user_ns(), uid);
 		newattrs.ia_gid = make_kgid(current_user_ns(), gid);
@@ -251,8 +253,13 @@ void fixup_lower_ownership(struct dentry *dentry, const char *name)
 		mutex_lock(&inode->i_mutex);
 		error = security_path_chown(&path, newattrs.ia_uid, newattrs.ia_gid);
 		if (!error)
-			error = notify_change2(path.mnt, path.dentry, &newattrs);
+			error = notify_change2(path.mnt, path.dentry, &newattrs, &delegated_inode);
 		mutex_unlock(&inode->i_mutex);
+		if (delegated_inode) {
+			error = break_deleg_wait(&delegated_inode);
+			if (!error)
+				goto retry_deleg;
+		}
 		if (error)
 			pr_debug("sdcardfs: Failed to touch up lower fs gid/uid for %s\n", name);
 	}
