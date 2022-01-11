@@ -2,21 +2,6 @@
 # MMC core configuration
 #
 
-config MMC_UNSAFE_RESUME
-	bool "Assume MMC/SD cards are non-removable (DANGEROUS)"
-	help
-	  If you say Y here, the MMC layer will assume that all cards
-	  stayed in their respective slots during the suspend. The
-	  normal behaviour is to remove them at suspend and
-	  redetecting them at resume. Breaking this assumption will
-	  in most cases result in data corruption.
-
-	  This option is usually just for embedded systems which use
-	  a MMC/SD card for rootfs. Most people should say N here.
-
-	  This option sets a default which can be overridden by the
-	  module parameter "removable=0" or "removable=1".
-
 config MMC_CLKGATE
 	bool "MMC host clock gating"
 	help
@@ -24,6 +9,17 @@ config MMC_CLKGATE
 	  This is done to save power due to gating off the logic and bus
 	  noise when the MMC card is not in use. Your host driver has to
 	  support handling this in order for it to be of any use.
+
+	  If unsure, say N.
+
+config MMC_RING_BUFFER
+	bool "MMC_RING_BUFFER"
+	depends on MMC
+	default n
+	help
+	  This enables the ring buffer tracing of significant
+	  events for mmc driver to provide command history for
+	  debugging purpose.
 
 	  If unsure, say N.
 
