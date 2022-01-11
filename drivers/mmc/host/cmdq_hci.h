@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2016, 2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -88,6 +88,7 @@
 
 /* response mode error mask */
 #define CQRMEM		0x50
+#define CQ_EXCEPTION	(1 << 6)
 
 /* task error info */
 #define CQTERRI		0x54
@@ -102,6 +103,8 @@
 
 #define GET_CMD_ERR_TAG(__r__) ((__r__ & CQ_RMETI) >> 8)
 #define GET_DAT_ERR_TAG(__r__) ((__r__ & CQ_DTETI) >> 24)
+#define GET_CMD_ERR_CMD(__r__) (__r__ & 0x3F)
+#define GET_DAT_ERR_CMD(__r__) ((__r__ & 0x3F0000) >> 16)
 
 /* command response index */
 #define CQCRI		0x58
@@ -112,11 +115,6 @@
 #define CQ_INT_ALL	0xF
 #define CQIC_DEFAULT_ICCTH 31
 #define CQIC_DEFAULT_ICTOVAL 1
-
-#define CQ_CMD_DBG_RAM	0x158
-#define CQ_CMD_DBG_RAM_WA 0x198
-#define CQ_CMD_DBG_RAM_OL 0x19C
-
 
 /* attribute fields */
 #define VALID(x)	((x & 1) << 0)
@@ -148,6 +146,11 @@
 #define CQ_VENDOR_CFG	0x100
 #define CMDQ_SEND_STATUS_TRIGGER (1 << 31)
 
+struct task_history {
+	u64 task;
+	bool is_dcmd;
+};
+
 struct cmdq_host {
 	const struct cmdq_host_ops *ops;
 	void __iomem *mmio;
@@ -164,7 +167,6 @@ struct cmdq_host {
 	u32 quirks;
 #define CMDQ_QUIRK_SHORT_TXFR_DESC_SZ 0x1
 #define CMDQ_QUIRK_NO_DCMD	0x2
-#define CMDQ_QUIRK_PRIO_READ	(1<<2)
 
 	bool enabled;
 	bool halted;
@@ -188,6 +190,9 @@ struct cmdq_host {
 	dma_addr_t desc_dma_base;
 	dma_addr_t trans_desc_dma_base;
 
+	struct task_history *thist;
+	u8 thist_idx;
+
 	struct completion halt_comp;
 	struct mmc_request **mrq_slot;
 	void *private;
@@ -208,13 +213,11 @@ struct cmdq_host_ops {
 				u32 slot);
 	void (*crypto_cfg_reset)(struct mmc_host *mmc, unsigned int slot);
 	void (*post_cqe_halt)(struct mmc_host *mmc);
-	void (*pm_qos_update)(struct mmc_host *mmc, struct mmc_request *mrq,
-				bool enable);
 };
 
 static inline void cmdq_writel(struct cmdq_host *host, u32 val, int reg)
 {
-	if (unlikely(host->ops->write_l))
+	if (unlikely(host->ops && host->ops->write_l))
 		host->ops->write_l(host, val, reg);
 	else
 		writel_relaxed(val, host->mmio + reg);
@@ -222,13 +225,13 @@ static inline void cmdq_writel(struct cmdq_host *host, u32 val, int reg)
 
 static inline u32 cmdq_readl(struct cmdq_host *host, int reg)
 {
-	if (unlikely(host->ops->read_l))
+	if (unlikely(host->ops && host->ops->read_l))
 		return host->ops->read_l(host, reg);
 	else
 		return readl_relaxed(host->mmio + reg);
 }
 
-extern irqreturn_t cmdq_irq(struct mmc_host *mmc, int err);
+extern irqreturn_t cmdq_irq(struct mmc_host *mmc, int err, bool is_cmd_err);
 extern int cmdq_init(struct cmdq_host *cq_host, struct mmc_host *mmc,
 		     bool dma64);
 extern struct cmdq_host *cmdq_pltfm_init(struct platform_device *pdev);
