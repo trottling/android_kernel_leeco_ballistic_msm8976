@@ -17,11 +17,6 @@
 #include <net/sock.h>
 #include <net/fib_rules.h>
 
-#define uid_valid(uid) ((uid) != -1)
-#define uid_lte(a, b) ((a) <= (b))
-#define uid_eq(a, b) ((a) == (b))
-#define uid_gte(a, b) ((a) >= (b))
-
 static const struct fib_kuid_range fib_kuid_range_unset = {
 	KUIDT_INIT(0),
 	KUIDT_INIT(~0),
