@@ -129,6 +129,8 @@ xt_socket_get_sock_v4(struct net *net, const u8 protocol,
 	return NULL;
 }
 
+
+
 struct sock*
 xt_socket_get4_sk(const struct sk_buff *skb, struct xt_action_param *par)
 {
@@ -206,6 +208,7 @@ socket_match(const struct sk_buff *skb, struct xt_action_param *par,
 	struct sock *sk;
 
 	sk = xt_socket_get4_sk(skb, par);
+
 	if (sk) {
 		bool wildcard;
 		bool transparent = true;
@@ -388,6 +391,7 @@ socket_mt6_v1_v2_v3(const struct sk_buff *skb, struct xt_action_param *par)
 	const struct xt_socket_mtinfo1 *info;
 
 	info = (struct xt_socket_mtinfo1 *) par->matchinfo;
+
 	sk = xt_socket_get6_sk(skb, par);
 
 	if (sk) {
