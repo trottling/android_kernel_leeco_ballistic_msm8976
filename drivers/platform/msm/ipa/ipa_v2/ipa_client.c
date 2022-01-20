@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2016, 2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -38,7 +38,7 @@ int ipa_enable_data_path(u32 clnt_hdl)
 		memset(&holb_cfg, 0 , sizeof(holb_cfg));
 		holb_cfg.en = IPA_HOLB_TMR_DIS;
 		holb_cfg.tmr_val = 0;
-		res = ipa_cfg_ep_holb(clnt_hdl, &holb_cfg);
+		res = ipa2_cfg_ep_holb(clnt_hdl, &holb_cfg);
 	}
 
 	/* Enable the pipe */
@@ -48,7 +48,7 @@ int ipa_enable_data_path(u32 clnt_hdl)
 	     !ipa_should_pipe_be_suspended(ep->client))) {
 		memset(&ep_cfg_ctrl, 0 , sizeof(ep_cfg_ctrl));
 		ep_cfg_ctrl.ipa_ep_suspend = false;
-		ipa_cfg_ep_ctrl(clnt_hdl, &ep_cfg_ctrl);
+		ipa2_cfg_ep_ctrl(clnt_hdl, &ep_cfg_ctrl);
 	}
 
 	return res;
@@ -69,24 +69,73 @@ int ipa_disable_data_path(u32 clnt_hdl)
 		memset(&holb_cfg, 0, sizeof(holb_cfg));
 		holb_cfg.en = IPA_HOLB_TMR_EN;
 		holb_cfg.tmr_val = 0;
-		res = ipa_cfg_ep_holb(clnt_hdl, &holb_cfg);
+		res = ipa2_cfg_ep_holb(clnt_hdl, &holb_cfg);
 	}
 
 	/* Suspend the pipe */
 	if (IPA_CLIENT_IS_CONS(ep->client)) {
 		memset(&ep_cfg_ctrl, 0 , sizeof(struct ipa_ep_cfg_ctrl));
 		ep_cfg_ctrl.ipa_ep_suspend = true;
-		ipa_cfg_ep_ctrl(clnt_hdl, &ep_cfg_ctrl);
+		ipa2_cfg_ep_ctrl(clnt_hdl, &ep_cfg_ctrl);
 	}
 
 	udelay(IPA_PKT_FLUSH_TO_US);
 	aggr_init = ipa_read_reg(ipa_ctx->mmio,
 			IPA_ENDP_INIT_AGGR_N_OFST_v2_0(clnt_hdl));
 	if (((aggr_init & IPA_ENDP_INIT_AGGR_N_AGGR_EN_BMSK) >>
-	    IPA_ENDP_INIT_AGGR_N_AGGR_EN_SHFT) == IPA_ENABLE_AGGR)
-		ipa_tag_aggr_force_close(clnt_hdl);
+	    IPA_ENDP_INIT_AGGR_N_AGGR_EN_SHFT) == IPA_ENABLE_AGGR) {
+		res = ipa_tag_aggr_force_close(clnt_hdl);
+		if (res) {
+			IPAERR("tag process timeout, client:%d err:%d\n",
+				clnt_hdl, res);
+			BUG();
+		}
+	}
 
 	return res;
+}
+
+static int ipa2_smmu_map_peer_bam(unsigned long dev)
+{
+	phys_addr_t base = 0;
+	u32 size = 0;
+	struct iommu_domain *smmu_domain;
+	struct ipa_smmu_cb_ctx *cb = ipa2_get_smmu_ctx();
+
+	if (!ipa_ctx->smmu_s1_bypass) {
+		if (ipa_ctx->peer_bam_map_cnt == 0) {
+			if (sps_get_bam_addr(dev, &base, &size)) {
+				IPAERR("Fail to get addr\n");
+				return -EINVAL;
+			}
+			smmu_domain = ipa2_get_smmu_domain();
+			if (smmu_domain != NULL) {
+				if (ipa_iommu_map(smmu_domain,
+					cb->va_end,
+					rounddown(base, PAGE_SIZE),
+					roundup(size + base -
+					rounddown(base, PAGE_SIZE), PAGE_SIZE),
+					IOMMU_READ | IOMMU_WRITE |
+					IOMMU_DEVICE)) {
+					IPAERR("Fail to ipa_iommu_map\n");
+					return -EINVAL;
+				}
+			}
+
+			ipa_ctx->peer_bam_iova = cb->va_end;
+			ipa_ctx->peer_bam_pa = base;
+			ipa_ctx->peer_bam_map_size = size;
+			ipa_ctx->peer_bam_dev = dev;
+
+			IPADBG("Peer bam %lu mapped\n", dev);
+		} else {
+			WARN_ON(dev != ipa_ctx->peer_bam_dev);
+		}
+
+		ipa_ctx->peer_bam_map_cnt++;
+	}
+
+	return 0;
 }
 
 static int ipa_connect_configure_sps(const struct ipa_connect_params *in,
@@ -97,7 +146,7 @@ static int ipa_connect_configure_sps(const struct ipa_connect_params *in,
 	/* Default Config */
 	ep->ep_hdl = sps_alloc_endpoint();
 
-	if (ipa_smmu_map_peer_bam(in->client_bam_hdl)) {
+	if (ipa2_smmu_map_peer_bam(in->client_bam_hdl)) {
 		IPAERR("fail to iommu map peer BAM.\n");
 		return -EFAULT;
 	}
@@ -170,11 +219,11 @@ static int ipa_connect_allocate_fifo(const struct ipa_connect_params *in,
 			dma_alloc_coherent(ipa_ctx->pdev, mem_buff_ptr->size,
 			&dma_addr, GFP_KERNEL);
 	}
-	if (!ipa_ctx->smmu_present) {
+	if (ipa_ctx->smmu_s1_bypass) {
 		mem_buff_ptr->phys_base = dma_addr;
 	} else {
 		mem_buff_ptr->iova = dma_addr;
-		smmu_domain = ipa_get_smmu_domain();
+		smmu_domain = ipa2_get_smmu_domain();
 		if (smmu_domain != NULL) {
 			mem_buff_ptr->phys_base =
 				iommu_iova_to_phys(smmu_domain, dma_addr);
@@ -189,7 +238,7 @@ static int ipa_connect_allocate_fifo(const struct ipa_connect_params *in,
 }
 
 /**
- * ipa_connect() - low-level IPA client connect
+ * ipa2_connect() - low-level IPA client connect
  * @in:	[in] input parameters from client
  * @sps:	[out] sps output from IPA needed by client for sps_connect
  * @clnt_hdl:	[out] opaque client handle assigned by IPA to client
@@ -203,8 +252,8 @@ static int ipa_connect_allocate_fifo(const struct ipa_connect_params *in,
  *
  * Note:	Should not be called from atomic context
  */
-int ipa_connect(const struct ipa_connect_params *in, struct ipa_sps_params *sps,
-		u32 *clnt_hdl)
+int ipa2_connect(const struct ipa_connect_params *in,
+		struct ipa_sps_params *sps, u32 *clnt_hdl)
 {
 	int ipa_ep_idx;
 	int result = -EFAULT;
@@ -227,7 +276,7 @@ int ipa_connect(const struct ipa_connect_params *in, struct ipa_sps_params *sps,
 		return -EINVAL;
 	}
 
-	ipa_ep_idx = ipa_get_ep_mapping(in->client);
+	ipa_ep_idx = ipa2_get_ep_mapping(in->client);
 	if (ipa_ep_idx == -1) {
 		IPAERR("fail to alloc EP.\n");
 		goto fail;
@@ -241,7 +290,8 @@ int ipa_connect(const struct ipa_connect_params *in, struct ipa_sps_params *sps,
 	}
 
 	memset(&ipa_ctx->ep[ipa_ep_idx], 0, sizeof(struct ipa_ep_context));
-	ipa_inc_client_enable_clks();
+	IPA_ACTIVE_CLIENTS_INC_EP(in->client);
+
 
 	ep->skip_ep_cfg = in->skip_ep_cfg;
 	ep->valid = 1;
@@ -264,13 +314,13 @@ int ipa_connect(const struct ipa_connect_params *in, struct ipa_sps_params *sps,
 	}
 
 	if (!ep->skip_ep_cfg) {
-		if (ipa_cfg_ep(ipa_ep_idx, &in->ipa_ep_cfg)) {
+		if (ipa2_cfg_ep(ipa_ep_idx, &in->ipa_ep_cfg)) {
 			IPAERR("fail to configure EP.\n");
 			goto ipa_cfg_ep_fail;
 		}
 		/* Setting EP status 0 */
 		memset(&ep_status, 0, sizeof(ep_status));
-		if (ipa_cfg_ep_status(ipa_ep_idx, &ep_status)) {
+		if (ipa2_cfg_ep_status(ipa_ep_idx, &ep_status)) {
 			IPAERR("fail to configure status of EP.\n");
 			goto ipa_cfg_ep_fail;
 		}
@@ -285,7 +335,7 @@ int ipa_connect(const struct ipa_connect_params *in, struct ipa_sps_params *sps,
 		goto ipa_cfg_ep_fail;
 	}
 
-	if (ipa_ctx->smmu_present &&
+	if (!ipa_ctx->smmu_s1_bypass &&
 			(in->desc.base == NULL ||
 			 in->data.base == NULL)) {
 		IPAERR(" allocate FIFOs data_fifo=0x%p desc_fifo=0x%p.\n",
@@ -327,38 +377,39 @@ int ipa_connect(const struct ipa_connect_params *in, struct ipa_sps_params *sps,
 	IPADBG("Data FIFO pa=%pa, size=%d\n", &ep->connect.data.phys_base,
 	       ep->connect.data.size);
 
-	if (ipa_ctx->smmu_present) {
+	if (!ipa_ctx->smmu_s1_bypass) {
 		ep->connect.data.iova = ep->connect.data.phys_base;
 		base = ep->connect.data.iova;
-		smmu_domain = ipa_get_smmu_domain();
+		smmu_domain = ipa2_get_smmu_domain();
 		if (smmu_domain != NULL) {
-			if (iommu_map(smmu_domain,
+			if (ipa_iommu_map(smmu_domain,
 				rounddown(base, PAGE_SIZE),
 				rounddown(base, PAGE_SIZE),
 				roundup(ep->connect.data.size + base -
 					rounddown(base, PAGE_SIZE), PAGE_SIZE),
 				IOMMU_READ | IOMMU_WRITE)) {
-				IPAERR("Fail to iommu_map data FIFO\n");
+				IPAERR("Fail to ipa_iommu_map data FIFO\n");
 				goto iommu_map_data_fail;
 			}
 		}
 		ep->connect.desc.iova = ep->connect.desc.phys_base;
 		base = ep->connect.desc.iova;
 		if (smmu_domain != NULL) {
-			if (iommu_map(smmu_domain,
+			if (ipa_iommu_map(smmu_domain,
 				rounddown(base, PAGE_SIZE),
 				rounddown(base, PAGE_SIZE),
 				roundup(ep->connect.desc.size + base -
 					rounddown(base, PAGE_SIZE), PAGE_SIZE),
 				IOMMU_READ | IOMMU_WRITE)) {
-				IPAERR("Fail to iommu_map desc FIFO\n");
+				IPAERR("Fail to ipa_iommu_map desc FIFO\n");
 				goto iommu_map_desc_fail;
 			}
 		}
 	}
 
 	if ((ipa_ctx->ipa_hw_type == IPA_HW_v2_0 ||
-		ipa_ctx->ipa_hw_type == IPA_HW_v2_5) &&
+		ipa_ctx->ipa_hw_type == IPA_HW_v2_5 ||
+		ipa_ctx->ipa_hw_type == IPA_HW_v2_6L) &&
 		IPA_CLIENT_IS_USB_CONS(in->client))
 		ep->connect.event_thresh = IPA_USB_EVENT_THRESHOLD;
 	else
@@ -382,16 +433,16 @@ int ipa_connect(const struct ipa_connect_params *in, struct ipa_sps_params *sps,
 		ipa_install_dflt_flt_rules(ipa_ep_idx);
 
 	if (!ep->keep_ipa_awake)
-		ipa_dec_client_disable_clks();
+		IPA_ACTIVE_CLIENTS_DEC_EP(in->client);
 
 	IPADBG("client %d (ep: %d) connected\n", in->client, ipa_ep_idx);
 
 	return 0;
 
 sps_connect_fail:
-	if (ipa_ctx->smmu_present) {
+	if (!ipa_ctx->smmu_s1_bypass) {
 		base = ep->connect.desc.iova;
-		smmu_domain = ipa_get_smmu_domain();
+		smmu_domain = ipa2_get_smmu_domain();
 		if (smmu_domain != NULL) {
 			iommu_unmap(smmu_domain,
 				rounddown(base, PAGE_SIZE),
@@ -400,9 +451,9 @@ sps_connect_fail:
 		}
 	}
 iommu_map_desc_fail:
-	if (ipa_ctx->smmu_present) {
+	if (!ipa_ctx->smmu_s1_bypass) {
 		base = ep->connect.data.iova;
-		smmu_domain = ipa_get_smmu_domain();
+		smmu_domain = ipa2_get_smmu_domain();
 		if (smmu_domain != NULL) {
 			iommu_unmap(smmu_domain,
 				rounddown(base, PAGE_SIZE),
@@ -436,14 +487,42 @@ desc_mem_alloc_fail:
 	sps_free_endpoint(ep->ep_hdl);
 ipa_cfg_ep_fail:
 	memset(&ipa_ctx->ep[ipa_ep_idx], 0, sizeof(struct ipa_ep_context));
-	ipa_dec_client_disable_clks();
+	IPA_ACTIVE_CLIENTS_DEC_EP(in->client);
 fail:
 	return result;
 }
-EXPORT_SYMBOL(ipa_connect);
+
+static int ipa2_smmu_unmap_peer_bam(unsigned long dev)
+{
+	size_t len;
+	struct iommu_domain *smmu_domain;
+	struct ipa_smmu_cb_ctx *cb = ipa2_get_smmu_ctx();
+
+	if (!ipa_ctx->smmu_s1_bypass) {
+		WARN_ON(dev != ipa_ctx->peer_bam_dev);
+		ipa_ctx->peer_bam_map_cnt--;
+		if (ipa_ctx->peer_bam_map_cnt == 0) {
+			len = roundup(ipa_ctx->peer_bam_map_size +
+					ipa_ctx->peer_bam_pa -
+					rounddown(ipa_ctx->peer_bam_pa,
+						PAGE_SIZE), PAGE_SIZE);
+			smmu_domain = ipa2_get_smmu_domain();
+			if (smmu_domain != NULL) {
+				if (iommu_unmap(smmu_domain,
+					cb->va_end, len) != len) {
+					IPAERR("Fail to iommu_unmap\n");
+					return -EINVAL;
+				}
+				IPADBG("Peer bam %lu unmapped\n", dev);
+			}
+		}
+	}
+
+	return 0;
+}
 
 /**
- * ipa_disconnect() - low-level IPA client disconnect
+ * ipa2_disconnect() - low-level IPA client disconnect
  * @clnt_hdl:	[in] opaque client handle assigned by IPA to client
  *
  * Should be called by the driver of the peripheral that wants to disconnect
@@ -454,7 +533,7 @@ EXPORT_SYMBOL(ipa_connect);
  *
  * Note:	Should not be called from atomic context
  */
-int ipa_disconnect(u32 clnt_hdl)
+int ipa2_disconnect(u32 clnt_hdl)
 {
 	int result;
 	struct ipa_ep_context *ep;
@@ -463,6 +542,7 @@ int ipa_disconnect(u32 clnt_hdl)
 	struct iommu_domain *smmu_domain;
 	struct ipa_disable_force_clear_datapath_req_msg_v01 req = {0};
 	int res;
+	enum ipa_client_type client_type;
 
 	if (unlikely(!ipa_ctx)) {
 		IPAERR("IPA driver was not initialized\n");
@@ -476,26 +556,34 @@ int ipa_disconnect(u32 clnt_hdl)
 	}
 
 	ep = &ipa_ctx->ep[clnt_hdl];
-
+	client_type = ipa2_get_client_mapping(clnt_hdl);
 	if (!ep->keep_ipa_awake)
-		ipa_inc_client_enable_clks();
+		IPA_ACTIVE_CLIENTS_INC_EP(client_type);
 
-	/* Set Disconnect in Progress flag. */
-	spin_lock(&ipa_ctx->disconnect_lock);
-	ep->disconnect_in_progress = true;
-	spin_unlock(&ipa_ctx->disconnect_lock);
+	/* For USB 2.0 controller, first the ep will be disabled.
+	 * so this sequence is not needed again when disconnecting the pipe.
+	 */
+	if (!ep->ep_disabled) {
+		/* Set Disconnect in Progress flag. */
+		spin_lock(&ipa_ctx->disconnect_lock);
+		ep->disconnect_in_progress = true;
+		spin_unlock(&ipa_ctx->disconnect_lock);
 
-	/* Notify uc to stop monitoring holb on USB BAM Producer pipe. */
-	if (IPA_CLIENT_IS_USB_CONS(ep->client)) {
-		ipa_uc_monitor_holb(ep->client, false);
-		IPADBG("Disabling holb monitor for client: %d\n", ep->client);
-	}
+		/* Notify uc to stop monitoring holb on USB BAM
+		 * Producer pipe.
+		 */
+		if (IPA_CLIENT_IS_USB_CONS(ep->client)) {
+			ipa_uc_monitor_holb(ep->client, false);
+			IPADBG("Disabling holb monitor for client: %d\n",
+				ep->client);
+		}
 
-	result = ipa_disable_data_path(clnt_hdl);
-	if (result) {
-		IPAERR("disable data path failed res=%d clnt=%d.\n", result,
-				clnt_hdl);
-		return -EPERM;
+		result = ipa_disable_data_path(clnt_hdl);
+		if (result) {
+			IPAERR("disable data path failed res=%d clnt=%d.\n",
+				result, clnt_hdl);
+			return -EPERM;
+		}
 	}
 
 	result = sps_disconnect(ep->ep_hdl);
@@ -509,7 +597,7 @@ int ipa_disconnect(u32 clnt_hdl)
 	else
 		peer_bam = ep->connect.source;
 
-	if (ipa_smmu_unmap_peer_bam(peer_bam)) {
+	if (ipa2_smmu_unmap_peer_bam(peer_bam)) {
 		IPAERR("fail to iommu unmap peer BAM.\n");
 		return -EPERM;
 	}
@@ -538,9 +626,9 @@ int ipa_disconnect(u32 clnt_hdl)
 					  ep->connect.data.size);
 	}
 
-	if (ipa_ctx->smmu_present) {
+	if (!ipa_ctx->smmu_s1_bypass) {
 		base = ep->connect.desc.iova;
-		smmu_domain = ipa_get_smmu_domain();
+		smmu_domain = ipa2_get_smmu_domain();
 		if (smmu_domain != NULL) {
 			iommu_unmap(smmu_domain,
 				rounddown(base, PAGE_SIZE),
@@ -549,9 +637,9 @@ int ipa_disconnect(u32 clnt_hdl)
 		}
 	}
 
-	if (ipa_ctx->smmu_present) {
+	if (!ipa_ctx->smmu_s1_bypass) {
 		base = ep->connect.data.iova;
-		smmu_domain = ipa_get_smmu_domain();
+		smmu_domain = ipa2_get_smmu_domain();
 		if (smmu_domain != NULL) {
 			iommu_unmap(smmu_domain,
 				rounddown(base, PAGE_SIZE),
@@ -585,23 +673,22 @@ int ipa_disconnect(u32 clnt_hdl)
 	memset(&ipa_ctx->ep[clnt_hdl], 0, sizeof(struct ipa_ep_context));
 	spin_unlock(&ipa_ctx->disconnect_lock);
 
-	ipa_dec_client_disable_clks();
+	IPA_ACTIVE_CLIENTS_DEC_EP(client_type);
 
 	IPADBG("client (ep: %d) disconnected\n", clnt_hdl);
 
 	return 0;
 }
-EXPORT_SYMBOL(ipa_disconnect);
 
 /**
-* ipa_reset_endpoint() - reset an endpoint from BAM perspective
+* ipa2_reset_endpoint() - reset an endpoint from BAM perspective
 * @clnt_hdl: [in] IPA client handle
 *
 * Returns:	0 on success, negative on failure
 *
 * Note:	Should not be called from atomic context
 */
-int ipa_reset_endpoint(u32 clnt_hdl)
+int ipa2_reset_endpoint(u32 clnt_hdl)
 {
 	int res;
 	struct ipa_ep_context *ep;
@@ -617,7 +704,7 @@ int ipa_reset_endpoint(u32 clnt_hdl)
 	}
 	ep = &ipa_ctx->ep[clnt_hdl];
 
-	ipa_inc_client_enable_clks();
+	IPA_ACTIVE_CLIENTS_INC_EP(ipa2_get_client_mapping(clnt_hdl));
 	res = sps_disconnect(ep->ep_hdl);
 	if (res) {
 		IPAERR("sps_disconnect() failed, res=%d.\n", res);
@@ -632,42 +719,13 @@ int ipa_reset_endpoint(u32 clnt_hdl)
 	}
 
 bail:
-	ipa_dec_client_disable_clks();
+	IPA_ACTIVE_CLIENTS_DEC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	return res;
 }
-EXPORT_SYMBOL(ipa_reset_endpoint);
 
 /**
- * ipa_sps_connect_safe() - connect endpoint from BAM prespective
- * @h: [in] sps pipe handle
- * @connect: [in] sps connect parameters
- * @ipa_client: [in] ipa client handle representing the pipe
- *
- * This function connects a BAM pipe using SPS driver sps_connect() API
- * and by requesting uC interface to reset the pipe, avoids an IPA HW
- * limitation that does not allow resetting a BAM pipe during traffic in
- * IPA TX command queue.
- *
- * Returns:	0 on success, negative on failure
- */
-int ipa_sps_connect_safe(struct sps_pipe *h, struct sps_connect *connect,
-			 enum ipa_client_type ipa_client)
-{
-	int res;
-
-	if (ipa_ctx->ipa_hw_type > IPA_HW_v2_5 || ipa_ctx->skip_uc_pipe_reset) {
-		IPADBG("uC pipe reset is not required\n");
-	} else {
-		res = ipa_uc_reset_pipe(ipa_client);
-		if (res)
-			return res;
-	}
-	return sps_connect(h, connect);
-}
-EXPORT_SYMBOL(ipa_sps_connect_safe);
-/**
- * ipa_clear_endpoint_delay() - Remove ep delay set on the IPA pipe before
+ * ipa2_clear_endpoint_delay() - Remove ep delay set on the IPA pipe before
  * client disconnect.
  * @clnt_hdl:	[in] opaque client handle assigned by IPA to client
  *
@@ -680,7 +738,7 @@ EXPORT_SYMBOL(ipa_sps_connect_safe);
  *
  * Note:	Should not be called from atomic context
  */
-int ipa_clear_endpoint_delay(u32 clnt_hdl)
+int ipa2_clear_endpoint_delay(u32 clnt_hdl)
 {
 	struct ipa_ep_context *ep;
 	struct ipa_ep_cfg_ctrl ep_ctrl = {0};
@@ -713,8 +771,7 @@ int ipa_clear_endpoint_delay(u32 clnt_hdl)
 		ep->qmi_request_sent = true;
 	}
 
-
-	ipa_inc_client_enable_clks();
+	IPA_ACTIVE_CLIENTS_INC_EP(ipa2_get_client_mapping(clnt_hdl));
 	/* Set disconnect in progress flag so further flow control events are
 	 * not honored.
 	 */
@@ -725,12 +782,116 @@ int ipa_clear_endpoint_delay(u32 clnt_hdl)
 	/* If flow is disabled at this point, restore the ep state.*/
 	ep_ctrl.ipa_ep_delay = false;
 	ep_ctrl.ipa_ep_suspend = false;
-	ipa_cfg_ep_ctrl(clnt_hdl, &ep_ctrl);
+	ipa2_cfg_ep_ctrl(clnt_hdl, &ep_ctrl);
 
-	ipa_dec_client_disable_clks();
+	IPA_ACTIVE_CLIENTS_DEC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	IPADBG("client (ep: %d) removed ep delay\n", clnt_hdl);
 
 	return 0;
 }
-EXPORT_SYMBOL(ipa_clear_endpoint_delay);
+
+/**
+ * ipa2_disable_endpoint() - low-level IPA client disable endpoint
+ * @clnt_hdl:	[in] opaque client handle assigned by IPA to client
+ *
+ * Should be called by the driver of the peripheral that wants to
+ * disable the pipe from IPA in BAM-BAM mode.
+ *
+ * Returns:	0 on success, negative on failure
+ *
+ * Note:	Should not be called from atomic context
+ */
+int ipa2_disable_endpoint(u32 clnt_hdl)
+{
+	int result;
+	struct ipa_ep_context *ep;
+	enum ipa_client_type client_type;
+	unsigned long bam;
+
+	if (unlikely(!ipa_ctx)) {
+		IPAERR("IPA driver was not initialized\n");
+		return -EINVAL;
+	}
+
+	if (clnt_hdl >= ipa_ctx->ipa_num_pipes ||
+		ipa_ctx->ep[clnt_hdl].valid == 0) {
+		IPAERR("bad parm.\n");
+		return -EINVAL;
+	}
+
+	ep = &ipa_ctx->ep[clnt_hdl];
+	client_type = ipa2_get_client_mapping(clnt_hdl);
+	IPA_ACTIVE_CLIENTS_INC_EP(client_type);
+
+	/* Set Disconnect in Progress flag. */
+	spin_lock(&ipa_ctx->disconnect_lock);
+	ep->disconnect_in_progress = true;
+	spin_unlock(&ipa_ctx->disconnect_lock);
+
+	/* Notify uc to stop monitoring holb on USB BAM Producer pipe. */
+	if (IPA_CLIENT_IS_USB_CONS(ep->client)) {
+		ipa_uc_monitor_holb(ep->client, false);
+		IPADBG("Disabling holb monitor for client: %d\n", ep->client);
+	}
+
+	result = ipa_disable_data_path(clnt_hdl);
+	if (result) {
+		IPAERR("disable data path failed res=%d clnt=%d.\n", result,
+				clnt_hdl);
+		goto fail;
+	}
+
+	if (IPA_CLIENT_IS_CONS(ep->client))
+		bam = ep->connect.source;
+	else
+		bam = ep->connect.destination;
+
+	result = sps_pipe_reset(bam, clnt_hdl);
+	if (result) {
+		IPAERR("SPS pipe reset failed.\n");
+		goto fail;
+	}
+
+	ep->ep_disabled = true;
+
+	IPA_ACTIVE_CLIENTS_DEC_EP(client_type);
+
+	IPADBG("client (ep: %d) disabled\n", clnt_hdl);
+
+	return 0;
+
+fail:
+	IPA_ACTIVE_CLIENTS_DEC_EP(client_type);
+	return -EPERM;
+}
+
+
+/**
+ * ipa_sps_connect_safe() - connect endpoint from BAM prespective
+ * @h: [in] sps pipe handle
+ * @connect: [in] sps connect parameters
+ * @ipa_client: [in] ipa client handle representing the pipe
+ *
+ * This function connects a BAM pipe using SPS driver sps_connect() API
+ * and by requesting uC interface to reset the pipe, avoids an IPA HW
+ * limitation that does not allow resetting a BAM pipe during traffic in
+ * IPA TX command queue.
+ *
+ * Returns:	0 on success, negative on failure
+ */
+int ipa_sps_connect_safe(struct sps_pipe *h, struct sps_connect *connect,
+			 enum ipa_client_type ipa_client)
+{
+	int res;
+
+	if (ipa_ctx->ipa_hw_type > IPA_HW_v2_5 || ipa_ctx->skip_uc_pipe_reset) {
+		IPADBG("uC pipe reset is not required\n");
+	} else {
+		res = ipa_uc_reset_pipe(ipa_client);
+		if (res)
+			return res;
+	}
+	return sps_connect(h, connect);
+}
+EXPORT_SYMBOL(ipa_sps_connect_safe);

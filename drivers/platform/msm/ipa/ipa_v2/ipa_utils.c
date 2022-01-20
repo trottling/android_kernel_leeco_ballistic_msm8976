@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -17,6 +17,7 @@
 #include <linux/msm-bus.h>
 #include <linux/msm-bus-board.h>
 #include "ipa_i.h"
+#include "../ipa_rm_i.h"
 
 #define IPA_V1_CLK_RATE (92.31 * 1000 * 1000UL)
 #define IPA_V1_1_CLK_RATE (100 * 1000 * 1000UL)
@@ -42,6 +43,17 @@
 #define IPA_AGGR_GRAN_MAX (32)
 #define IPA_EOT_COAL_GRAN_MIN (1)
 #define IPA_EOT_COAL_GRAN_MAX (16)
+#define MSEC 1000
+#define MIN_RX_POLL_TIME 1
+#define MAX_RX_POLL_TIME 5
+#define UPPER_CUTOFF 50
+#define LOWER_CUTOFF 10
+
+#define MAX_RETRY_ALLOC 10
+#define ALLOC_MIN_SLEEP_RX 100000
+#define ALLOC_MAX_SLEEP_RX 200000
+
+#define IPA_DEFAULT_SYS_YELLOW_WM 32
 
 #define IPA_AGGR_BYTE_LIMIT (\
 		IPA_ENDP_INIT_AGGR_N_AGGR_BYTE_LIMIT_BMSK >> \
@@ -78,12 +90,15 @@ static const int ep_mapping[3][IPA_CLIENT_MAX] = {
 	[IPA_1_1][IPA_CLIENT_A5_WLAN_AMPDU_PROD] = 15,
 	[IPA_1_1][IPA_CLIENT_A2_EMBEDDED_PROD]   =  8,
 	[IPA_1_1][IPA_CLIENT_A2_TETHERED_PROD]   =  6,
+	[IPA_1_1][IPA_CLIENT_APPS_LAN_PROD]      = -1,
 	[IPA_1_1][IPA_CLIENT_APPS_LAN_WAN_PROD]  =  2,
 	[IPA_1_1][IPA_CLIENT_APPS_CMD_PROD]      =  1,
 	[IPA_1_1][IPA_CLIENT_ODU_PROD]           = -1,
 	[IPA_1_1][IPA_CLIENT_MHI_PROD]           = -1,
 	[IPA_1_1][IPA_CLIENT_Q6_LAN_PROD]        =  5,
+	[IPA_1_1][IPA_CLIENT_Q6_WAN_PROD]        = -1,
 	[IPA_1_1][IPA_CLIENT_Q6_CMD_PROD]        = -1,
+	[IPA_1_1][IPA_CLIENT_ETHERNET_PROD]      = -1,
 
 	[IPA_1_1][IPA_CLIENT_HSIC1_CONS]         = 14,
 	[IPA_1_1][IPA_CLIENT_WLAN1_CONS]         = -1,
@@ -109,6 +124,7 @@ static const int ep_mapping[3][IPA_CLIENT_MAX] = {
 	[IPA_1_1][IPA_CLIENT_MHI_CONS]           = -1,
 	[IPA_1_1][IPA_CLIENT_Q6_LAN_CONS]        =  4,
 	[IPA_1_1][IPA_CLIENT_Q6_WAN_CONS]        = -1,
+	[IPA_1_1][IPA_CLIENT_ETHERNET_CONS]      = -1,
 
 
 	[IPA_2_0][IPA_CLIENT_HSIC1_PROD]         = 12,
@@ -124,11 +140,13 @@ static const int ep_mapping[3][IPA_CLIENT_MAX] = {
 	[IPA_2_0][IPA_CLIENT_A5_WLAN_AMPDU_PROD] = -1,
 	[IPA_2_0][IPA_CLIENT_A2_EMBEDDED_PROD]   = -1,
 	[IPA_2_0][IPA_CLIENT_A2_TETHERED_PROD]   = -1,
+	[IPA_2_0][IPA_CLIENT_APPS_LAN_PROD]      = -1,
 	[IPA_2_0][IPA_CLIENT_APPS_LAN_WAN_PROD]  =  4,
 	[IPA_2_0][IPA_CLIENT_APPS_CMD_PROD]      =  3,
 	[IPA_2_0][IPA_CLIENT_ODU_PROD]           = 12,
 	[IPA_2_0][IPA_CLIENT_MHI_PROD]           = 18,
 	[IPA_2_0][IPA_CLIENT_Q6_LAN_PROD]        =  6,
+	[IPA_2_0][IPA_CLIENT_Q6_WAN_PROD]	 = -1,
 	[IPA_2_0][IPA_CLIENT_Q6_CMD_PROD]        =  7,
 	[IPA_2_0][IPA_CLIENT_Q6_DECOMP_PROD]     = -1,
 	[IPA_2_0][IPA_CLIENT_Q6_DECOMP2_PROD]    = -1,
@@ -136,6 +154,7 @@ static const int ep_mapping[3][IPA_CLIENT_MAX] = {
 						 =  12,
 	[IPA_2_0][IPA_CLIENT_MEMCPY_DMA_ASYNC_PROD]
 						 =  19,
+	[IPA_2_0][IPA_CLIENT_ETHERNET_PROD]      = 12,
 	/* Only for test purpose */
 	[IPA_2_0][IPA_CLIENT_TEST_PROD]          = 19,
 	[IPA_2_0][IPA_CLIENT_TEST1_PROD]         = 19,
@@ -163,23 +182,27 @@ static const int ep_mapping[3][IPA_CLIENT_MAX] = {
 	[IPA_2_0][IPA_CLIENT_APPS_LAN_CONS]      =  2,
 	[IPA_2_0][IPA_CLIENT_APPS_WAN_CONS]      =  5,
 	[IPA_2_0][IPA_CLIENT_ODU_EMB_CONS]       = 13,
-	[IPA_2_0][IPA_CLIENT_ODU_TETH_CONS]      =  1,
+	[IPA_2_0][IPA_CLIENT_ODU_TETH_CONS]      = 1,
 	[IPA_2_0][IPA_CLIENT_MHI_CONS]           = 17,
 	[IPA_2_0][IPA_CLIENT_Q6_LAN_CONS]        =  8,
 	[IPA_2_0][IPA_CLIENT_Q6_WAN_CONS]        =  9,
-	[IPA_2_0][IPA_CLIENT_Q6_DUN_CONS]        = 10,
+	[IPA_2_0][IPA_CLIENT_Q6_DUN_CONS]        = -1,
 	[IPA_2_0][IPA_CLIENT_Q6_DECOMP_CONS]     = -1,
 	[IPA_2_0][IPA_CLIENT_Q6_DECOMP2_CONS]    = -1,
 	[IPA_2_0][IPA_CLIENT_MEMCPY_DMA_SYNC_CONS]
 						 =  13,
 	[IPA_2_0][IPA_CLIENT_MEMCPY_DMA_ASYNC_CONS]
 						 =  16,
+	[IPA_2_0][IPA_CLIENT_Q6_LTE_WIFI_AGGR_CONS]
+						 =  10,
+	[IPA_2_0][IPA_CLIENT_ETHERNET_CONS]      = 1,
 	/* Only for test purpose */
 	[IPA_2_0][IPA_CLIENT_TEST_CONS]          = 1,
 	[IPA_2_0][IPA_CLIENT_TEST1_CONS]         = 1,
 	[IPA_2_0][IPA_CLIENT_TEST2_CONS]         = 16,
 	[IPA_2_0][IPA_CLIENT_TEST3_CONS]         = 13,
 	[IPA_2_0][IPA_CLIENT_TEST4_CONS]         = 15,
+	[IPA_2_0][IPA_CLIENT_DUMMY_CONS]         = -1,
 
 
 	[IPA_2_6L][IPA_CLIENT_HSIC1_PROD]         = -1,
@@ -195,11 +218,13 @@ static const int ep_mapping[3][IPA_CLIENT_MAX] = {
 	[IPA_2_6L][IPA_CLIENT_A5_WLAN_AMPDU_PROD] = -1,
 	[IPA_2_6L][IPA_CLIENT_A2_EMBEDDED_PROD]   = -1,
 	[IPA_2_6L][IPA_CLIENT_A2_TETHERED_PROD]   = -1,
+	[IPA_2_6L][IPA_CLIENT_APPS_LAN_PROD]      = -1,
 	[IPA_2_6L][IPA_CLIENT_APPS_LAN_WAN_PROD]  =  4,
 	[IPA_2_6L][IPA_CLIENT_APPS_CMD_PROD]      =  3,
 	[IPA_2_6L][IPA_CLIENT_ODU_PROD]           = -1,
 	[IPA_2_6L][IPA_CLIENT_MHI_PROD]           = -1,
 	[IPA_2_6L][IPA_CLIENT_Q6_LAN_PROD]        =  6,
+	[IPA_2_6L][IPA_CLIENT_Q6_WAN_PROD]	  = -1,
 	[IPA_2_6L][IPA_CLIENT_Q6_CMD_PROD]        =  7,
 	[IPA_2_6L][IPA_CLIENT_Q6_DECOMP_PROD]     = 11,
 	[IPA_2_6L][IPA_CLIENT_Q6_DECOMP2_PROD]    = 13,
@@ -207,7 +232,7 @@ static const int ep_mapping[3][IPA_CLIENT_MAX] = {
 						 =  -1,
 	[IPA_2_6L][IPA_CLIENT_MEMCPY_DMA_ASYNC_PROD]
 						 =  -1,
-
+	[IPA_2_6L][IPA_CLIENT_ETHERNET_PROD]      = -1,
 	/* Only for test purpose */
 	[IPA_2_6L][IPA_CLIENT_TEST_PROD]          = 11,
 	[IPA_2_6L][IPA_CLIENT_TEST1_PROD]         = 11,
@@ -246,12 +271,16 @@ static const int ep_mapping[3][IPA_CLIENT_MAX] = {
 						 =  -1,
 	[IPA_2_6L][IPA_CLIENT_MEMCPY_DMA_ASYNC_CONS]
 						 =  -1,
+	[IPA_2_6L][IPA_CLIENT_Q6_LTE_WIFI_AGGR_CONS]
+						 =  -1,
+	[IPA_2_6L][IPA_CLIENT_ETHERNET_CONS]      = -1,
 	/* Only for test purpose */
 	[IPA_2_6L][IPA_CLIENT_TEST_CONS]          = 15,
 	[IPA_2_6L][IPA_CLIENT_TEST1_CONS]         = 15,
 	[IPA_2_6L][IPA_CLIENT_TEST2_CONS]         = 0,
 	[IPA_2_6L][IPA_CLIENT_TEST3_CONS]         = 1,
 	[IPA_2_6L][IPA_CLIENT_TEST4_CONS]         = 10,
+	[IPA_2_6L][IPA_CLIENT_DUMMY_CONS]         = -1,
 };
 
 static struct msm_bus_vectors ipa_init_vectors_v1_1[]  = {
@@ -436,6 +465,13 @@ int ipa_get_clients_from_rm_resource(
 	case IPA_RM_RESOURCE_MHI_CONS:
 		clients->names[i++] = IPA_CLIENT_MHI_CONS;
 		break;
+	case IPA_RM_RESOURCE_ODU_ADAPT_CONS:
+		clients->names[i++] = IPA_CLIENT_ODU_EMB_CONS;
+		clients->names[i++] = IPA_CLIENT_ODU_TETH_CONS;
+		break;
+	case IPA_RM_RESOURCE_ETHERNET_CONS:
+		clients->names[i++] = IPA_CLIENT_ETHERNET_CONS;
+		break;
 	case IPA_RM_RESOURCE_USB_PROD:
 		clients->names[i++] = IPA_CLIENT_USB_PROD;
 		break;
@@ -444,6 +480,12 @@ int ipa_get_clients_from_rm_resource(
 		break;
 	case IPA_RM_RESOURCE_MHI_PROD:
 		clients->names[i++] = IPA_CLIENT_MHI_PROD;
+		break;
+	case IPA_RM_RESOURCE_ODU_ADAPT_PROD:
+		clients->names[i++] = IPA_CLIENT_ODU_PROD;
+		break;
+	case IPA_RM_RESOURCE_ETHERNET_PROD:
+		clients->names[i++] = IPA_CLIENT_ETHERNET_PROD;
 		break;
 	default:
 		break;
@@ -464,7 +506,7 @@ bool ipa_should_pipe_be_suspended(enum ipa_client_type client)
 	struct ipa_ep_context *ep;
 	int ipa_ep_idx;
 
-	ipa_ep_idx = ipa_get_ep_mapping(client);
+	ipa_ep_idx = ipa2_get_ep_mapping(client);
 	if (ipa_ep_idx == -1) {
 		IPAERR("Invalid client.\n");
 		WARN_ON(1);
@@ -476,20 +518,23 @@ bool ipa_should_pipe_be_suspended(enum ipa_client_type client)
 	if (ep->keep_ipa_awake)
 		return false;
 
-	if (client == IPA_CLIENT_USB_CONS   ||
-	    client == IPA_CLIENT_MHI_CONS   ||
-	    client == IPA_CLIENT_HSIC1_CONS ||
-	    client == IPA_CLIENT_WLAN1_CONS ||
-	    client == IPA_CLIENT_WLAN2_CONS ||
-	    client == IPA_CLIENT_WLAN3_CONS ||
-	    client == IPA_CLIENT_WLAN4_CONS)
+	if (client == IPA_CLIENT_USB_CONS     ||
+	    client == IPA_CLIENT_MHI_CONS     ||
+	    client == IPA_CLIENT_HSIC1_CONS   ||
+	    client == IPA_CLIENT_WLAN1_CONS   ||
+	    client == IPA_CLIENT_WLAN2_CONS   ||
+	    client == IPA_CLIENT_WLAN3_CONS   ||
+	    client == IPA_CLIENT_WLAN4_CONS   ||
+	    client == IPA_CLIENT_ODU_EMB_CONS ||
+	    client == IPA_CLIENT_ODU_TETH_CONS ||
+	    client == IPA_CLIENT_ETHERNET_CONS)
 		return true;
 
 	return false;
 }
 
 /**
- * ipa_suspend_resource_sync() - suspend client endpoints related to the IPA_RM
+ * ipa2_suspend_resource_sync() - suspend client endpoints related to the IPA_RM
  * resource and decrement active clients counter, which may result in clock
  * gating of IPA clocks.
  *
@@ -497,7 +542,7 @@ bool ipa_should_pipe_be_suspended(enum ipa_client_type client)
  *
  * Return codes: 0 on success, negative on failure.
  */
-int ipa_suspend_resource_sync(enum ipa_rm_resource_name resource)
+int ipa2_suspend_resource_sync(enum ipa_rm_resource_name resource)
 {
 	struct ipa_client_names clients;
 	int res;
@@ -516,7 +561,7 @@ int ipa_suspend_resource_sync(enum ipa_rm_resource_name resource)
 
 	for (index = 0; index < clients.length; index++) {
 		client = clients.names[index];
-		ipa_ep_idx = ipa_get_ep_mapping(client);
+		ipa_ep_idx = ipa2_get_ep_mapping(client);
 		if (ipa_ep_idx == -1) {
 			IPAERR("Invalid client.\n");
 			res = -EINVAL;
@@ -529,7 +574,7 @@ int ipa_suspend_resource_sync(enum ipa_rm_resource_name resource)
 				/* suspend endpoint */
 				memset(&suspend, 0, sizeof(suspend));
 				suspend.ipa_ep_suspend = true;
-				ipa_cfg_ep_ctrl(ipa_ep_idx, &suspend);
+				ipa2_cfg_ep_ctrl(ipa_ep_idx, &suspend);
 				pipe_suspended = true;
 			}
 		}
@@ -540,13 +585,13 @@ int ipa_suspend_resource_sync(enum ipa_rm_resource_name resource)
 
 	/* before gating IPA clocks do TAG process */
 	ipa_ctx->tag_process_before_gating = true;
-	ipa_dec_client_disable_clks();
+	IPA_ACTIVE_CLIENTS_DEC_RESOURCE(ipa_rm_resource_str(resource));
 
 	return 0;
 }
 
 /**
- * ipa_suspend_resource_no_block() - suspend client endpoints related to the
+ * ipa2_suspend_resource_no_block() - suspend client endpoints related to the
  * IPA_RM resource and decrement active clients counter. This function is
  * guaranteed to avoid sleeping.
  *
@@ -554,7 +599,7 @@ int ipa_suspend_resource_sync(enum ipa_rm_resource_name resource)
  *
  * Return codes: 0 on success, negative on failure.
  */
-int ipa_suspend_resource_no_block(enum ipa_rm_resource_name resource)
+int ipa2_suspend_resource_no_block(enum ipa_rm_resource_name resource)
 {
 	int res;
 	struct ipa_client_names clients;
@@ -563,6 +608,7 @@ int ipa_suspend_resource_no_block(enum ipa_rm_resource_name resource)
 	struct ipa_ep_cfg_ctrl suspend;
 	int ipa_ep_idx;
 	unsigned long flags;
+	struct ipa_active_client_logging_info log_info;
 
 	if (ipa_active_clients_trylock(&flags) == 0)
 		return -EPERM;
@@ -581,7 +627,7 @@ int ipa_suspend_resource_no_block(enum ipa_rm_resource_name resource)
 
 	for (index = 0; index < clients.length; index++) {
 		client = clients.names[index];
-		ipa_ep_idx = ipa_get_ep_mapping(client);
+		ipa_ep_idx = ipa2_get_ep_mapping(client);
 		if (ipa_ep_idx == -1) {
 			IPAERR("Invalid client.\n");
 			res = -EINVAL;
@@ -594,12 +640,15 @@ int ipa_suspend_resource_no_block(enum ipa_rm_resource_name resource)
 				/* suspend endpoint */
 				memset(&suspend, 0, sizeof(suspend));
 				suspend.ipa_ep_suspend = true;
-				ipa_cfg_ep_ctrl(ipa_ep_idx, &suspend);
+				ipa2_cfg_ep_ctrl(ipa_ep_idx, &suspend);
 			}
 		}
 	}
 
 	if (res == 0) {
+		IPA_ACTIVE_CLIENTS_PREP_RESOURCE(log_info,
+				ipa_rm_resource_str(resource));
+		ipa2_active_clients_log_dec(&log_info, true);
 		ipa_ctx->ipa_active_clients.cnt--;
 		IPADBG("active clients = %d\n",
 		       ipa_ctx->ipa_active_clients.cnt);
@@ -611,14 +660,14 @@ bail:
 }
 
 /**
- * ipa_resume_resource() - resume client endpoints related to the IPA_RM
+ * ipa2_resume_resource() - resume client endpoints related to the IPA_RM
  * resource.
  *
  * @resource: [IN] IPA Resource Manager resource
  *
  * Return codes: 0 on success, negative on failure.
  */
-int ipa_resume_resource(enum ipa_rm_resource_name resource)
+int ipa2_resume_resource(enum ipa_rm_resource_name resource)
 {
 
 	struct ipa_client_names clients;
@@ -637,7 +686,7 @@ int ipa_resume_resource(enum ipa_rm_resource_name resource)
 
 	for (index = 0; index < clients.length; index++) {
 		client = clients.names[index];
-		ipa_ep_idx = ipa_get_ep_mapping(client);
+		ipa_ep_idx = ipa2_get_ep_mapping(client);
 		if (ipa_ep_idx == -1) {
 			IPAERR("Invalid client.\n");
 			res = -EINVAL;
@@ -651,11 +700,14 @@ int ipa_resume_resource(enum ipa_rm_resource_name resource)
 		IPADBG("%d will be resumed on connect.\n", client);
 		if (ipa_ctx->ep[ipa_ep_idx].client == client &&
 		    ipa_should_pipe_be_suspended(client)) {
-			if (ipa_ctx->ep[ipa_ep_idx].valid) {
+			spin_lock(&ipa_ctx->disconnect_lock);
+			if (ipa_ctx->ep[ipa_ep_idx].valid &&
+			!ipa_ctx->ep[ipa_ep_idx].disconnect_in_progress) {
 				memset(&suspend, 0, sizeof(suspend));
 				suspend.ipa_ep_suspend = false;
-				ipa_cfg_ep_ctrl(ipa_ep_idx, &suspend);
+				ipa2_cfg_ep_ctrl(ipa_ep_idx, &suspend);
 			}
+			spin_unlock(&ipa_ctx->disconnect_lock);
 		}
 	}
 
@@ -811,11 +863,11 @@ int ipa_cfg_route(struct ipa_route *route)
 		route->route_def_hdr_ofst,
 		route->route_frag_def_pipe);
 
-	ipa_inc_client_enable_clks();
+	IPA_ACTIVE_CLIENTS_INC_SIMPLE();
 
 	ipa_ctx->ctrl->ipa_cfg_route(route);
 
-	ipa_dec_client_disable_clks();
+	IPA_ACTIVE_CLIENTS_DEC_SIMPLE();
 
 	return 0;
 }
@@ -831,12 +883,12 @@ int ipa_cfg_filter(u32 disable)
 {
 	u32 ipa_filter_ofst = IPA_FILTER_OFST_v1_1;
 
-	ipa_inc_client_enable_clks();
+	IPA_ACTIVE_CLIENTS_INC_SIMPLE();
 	ipa_write_reg(ipa_ctx->mmio, ipa_filter_ofst,
 			IPA_SETFIELD(!disable,
 					IPA_FILTER_FILTER_EN_SHFT,
 					IPA_FILTER_FILTER_EN_BMSK));
-	ipa_dec_client_disable_clks();
+	IPA_ACTIVE_CLIENTS_DEC_SIMPLE();
 
 	return 0;
 }
@@ -871,12 +923,12 @@ int ipa_init_hw(void)
 }
 
 /**
- * ipa_get_ep_mapping() - provide endpoint mapping
+ * ipa2_get_ep_mapping() - provide endpoint mapping
  * @client: client type
  *
- * Return value: endpoint mapping or -1 if unmapped/invalid
+ * Return value: endpoint mapping
  */
-int ipa_get_ep_mapping(enum ipa_client_type client)
+int ipa2_get_ep_mapping(enum ipa_client_type client)
 {
 	u8 hw_type_index = IPA_1_1;
 
@@ -905,14 +957,14 @@ int ipa_get_ep_mapping(enum ipa_client_type client)
 
 	return ep_mapping[hw_type_index][client];
 }
-EXPORT_SYMBOL(ipa_get_ep_mapping);
 
-/* ipa_set_client() - provide client mapping
+/* ipa2_set_client() - provide client mapping
  * @client: client type
  *
  * Return value: none
  */
-void ipa_set_client(int index, enum ipacm_client_enum client, bool uplink)
+
+void ipa2_set_client(int index, enum ipacm_client_enum client, bool uplink)
 {
 	if (client > IPACM_CLIENT_MAX || client < IPACM_CLIENT_USB) {
 		IPAERR("Bad client number! client =%d\n", client);
@@ -923,15 +975,14 @@ void ipa_set_client(int index, enum ipacm_client_enum client, bool uplink)
 		ipa_ctx->ipacm_client[index].uplink = uplink;
 	}
 }
-EXPORT_SYMBOL(ipa_set_client);
 
 /**
- * ipa_get_client() - provide client mapping
+ * ipa2_get_client() - provide client mapping
  * @client: client type
  *
  * Return value: none
  */
-enum ipacm_client_enum ipa_get_client(int pipe_idx)
+enum ipacm_client_enum ipa2_get_client(int pipe_idx)
 {
 	if (pipe_idx >= IPA_MAX_NUM_PIPES || pipe_idx < 0) {
 		IPAERR("Bad pipe index! pipe_idx =%d\n", pipe_idx);
@@ -940,22 +991,25 @@ enum ipacm_client_enum ipa_get_client(int pipe_idx)
 		return ipa_ctx->ipacm_client[pipe_idx].client_enum;
 	}
 }
-EXPORT_SYMBOL(ipa_get_client);
 
 /**
- * ipa_get_client_uplink() - provide client mapping
+ * ipa2_get_client_uplink() - provide client mapping
  * @client: client type
  *
  * Return value: none
  */
-bool ipa_get_client_uplink(int pipe_idx)
+bool ipa2_get_client_uplink(int pipe_idx)
 {
+	if (pipe_idx < 0 || pipe_idx >= IPA_MAX_NUM_PIPES) {
+		IPAERR("invalid pipe idx %d\n", pipe_idx);
+		return false;
+	}
+
 	return ipa_ctx->ipacm_client[pipe_idx].uplink;
 }
-EXPORT_SYMBOL(ipa_get_client_uplink);
 
 /**
- * ipa_get_rm_resource_from_ep() - get the IPA_RM resource which is related to
+ * ipa2_get_rm_resource_from_ep() - get the IPA_RM resource which is related to
  * the supplied pipe index.
  *
  * @pipe_idx:
@@ -963,7 +1017,7 @@ EXPORT_SYMBOL(ipa_get_client_uplink);
  * Return value: IPA_RM resource related to the pipe, -1 if a resource was not
  * found.
  */
-enum ipa_rm_resource_name ipa_get_rm_resource_from_ep(int pipe_idx)
+enum ipa_rm_resource_name ipa2_get_rm_resource_from_ep(int pipe_idx)
 {
 	int i;
 	int j;
@@ -1003,12 +1057,12 @@ enum ipa_rm_resource_name ipa_get_rm_resource_from_ep(int pipe_idx)
 }
 
 /**
- * ipa_get_client_mapping() - provide client mapping
+ * ipa2_get_client_mapping() - provide client mapping
  * @pipe_idx: IPA end-point number
  *
  * Return value: client mapping
  */
-enum ipa_client_type ipa_get_client_mapping(int pipe_idx)
+enum ipa_client_type ipa2_get_client_mapping(int pipe_idx)
 {
 	if (unlikely(!ipa_ctx)) {
 		IPAERR("IPA driver was not initialized\n");
@@ -1477,6 +1531,37 @@ int ipa_generate_hw_rule(enum ipa_ip_type ip,
 			ihl_ofst_meq32++;
 		}
 
+		if (attrib->attrib_mask & IPA_FLT_L2TP_INNER_IP_TYPE) {
+			if (ipa_ihl_ofst_meq32[ihl_ofst_meq32] == -1) {
+				IPAERR("ran out of ihl_meq32 eq\n");
+				return -EPERM;
+			}
+			*en_rule |= ipa_ihl_ofst_meq32[ihl_ofst_meq32];
+			/* 22  => offset of IP type after v6 header */
+			*buf = ipa_write_8(22, *buf);
+			*buf = ipa_write_32(0xF0000000, *buf);
+			if (attrib->type == 0x40)
+				*buf = ipa_write_32(0x40000000, *buf);
+			else
+				*buf = ipa_write_32(0x60000000, *buf);
+			*buf = ipa_pad_to_32(*buf);
+			ihl_ofst_meq32++;
+		}
+
+		if (attrib->attrib_mask & IPA_FLT_L2TP_INNER_IPV4_DST_ADDR) {
+			if (ipa_ihl_ofst_meq32[ihl_ofst_meq32] == -1) {
+				IPAERR("ran out of ihl_meq32 eq\n");
+				return -EPERM;
+			}
+			*en_rule |= ipa_ihl_ofst_meq32[ihl_ofst_meq32];
+			/* 38  => offset of inner IPv4 addr */
+			*buf = ipa_write_8(38, *buf);
+			*buf = ipa_write_32(attrib->u.v4.dst_addr_mask, *buf);
+			*buf = ipa_write_32(attrib->u.v4.dst_addr, *buf);
+			*buf = ipa_pad_to_32(*buf);
+			ihl_ofst_meq32++;
+		}
+
 		if (attrib->attrib_mask & IPA_FLT_SRC_PORT) {
 			if (ipa_ihl_ofst_rng16[ihl_ofst_rng16] == -1) {
 				IPAERR("ran out of ihl_rng16 eq\n");
@@ -1713,6 +1798,7 @@ int ipa_generate_hw_rule(enum ipa_ip_type ip,
 	 * OFFSET_MEQ32_0 with mask of 0 and val of 0 and offset 0
 	 */
 	if (attrib->attrib_mask == 0) {
+		IPADBG_LOW("building default rule\n");
 		if (ipa_ofst_meq32[ofst_meq32] == -1) {
 			IPAERR("ran out of meq32 eq\n");
 			return -EPERM;
@@ -2075,6 +2161,36 @@ int ipa_generate_flt_eq(enum ipa_ip_type ip,
 			ihl_ofst_meq32++;
 		}
 
+		if (attrib->attrib_mask & IPA_FLT_L2TP_INNER_IP_TYPE) {
+			if (ipa_ihl_ofst_meq32[ihl_ofst_meq32] == -1) {
+				IPAERR("ran out of ihl_meq32 eq\n");
+				return -EPERM;
+			}
+			*en_rule |= ipa_ihl_ofst_meq32[ihl_ofst_meq32];
+			/* 22  => offset of inner IP type after v6 header */
+			eq_atrb->ihl_offset_meq_32[ihl_ofst_meq32].offset = 22;
+			eq_atrb->ihl_offset_meq_32[ihl_ofst_meq32].mask =
+				0xF0000000;
+			eq_atrb->ihl_offset_meq_32[ihl_ofst_meq32].value =
+				(u32)attrib->type << 24;
+			ihl_ofst_meq32++;
+		}
+
+		if (attrib->attrib_mask & IPA_FLT_L2TP_INNER_IPV4_DST_ADDR) {
+			if (ipa_ihl_ofst_meq32[ihl_ofst_meq32] == -1) {
+				IPAERR("ran out of ihl_meq32 eq\n");
+				return -EPERM;
+			}
+			*en_rule |= ipa_ihl_ofst_meq32[ihl_ofst_meq32];
+			/* 38  => offset of inner IPv4 addr */
+			eq_atrb->ihl_offset_meq_32[ihl_ofst_meq32].offset = 38;
+			eq_atrb->ihl_offset_meq_32[ihl_ofst_meq32].mask =
+				attrib->u.v4.dst_addr_mask;
+			eq_atrb->ihl_offset_meq_32[ihl_ofst_meq32].value =
+				attrib->u.v4.dst_addr;
+			ihl_ofst_meq32++;
+		}
+
 		if (attrib->attrib_mask & IPA_FLT_SRC_PORT) {
 			if (ipa_ihl_ofst_rng16[ihl_ofst_rng16] == -1) {
 				IPAERR_RL("ran out of ihl_rng16 eq\n");
@@ -2109,7 +2225,7 @@ int ipa_generate_flt_eq(enum ipa_ip_type ip,
 				return -EPERM;
 			}
 			if (attrib->src_port_hi < attrib->src_port_lo) {
-				IPAERR("bad src port range param\n");
+				IPAERR_RL("bad src port range param\n");
 				return -EPERM;
 			}
 			*en_rule |= ipa_ihl_ofst_rng16[ihl_ofst_rng16];
@@ -2127,7 +2243,7 @@ int ipa_generate_flt_eq(enum ipa_ip_type ip,
 				return -EPERM;
 			}
 			if (attrib->dst_port_hi < attrib->dst_port_lo) {
-				IPAERR("bad dst port range param\n");
+				IPAERR_RL("bad dst port range param\n");
 				return -EPERM;
 			}
 			*en_rule |= ipa_ihl_ofst_rng16[ihl_ofst_rng16];
@@ -2317,7 +2433,7 @@ int ipa_generate_flt_eq(enum ipa_ip_type ip,
 		}
 
 	} else {
-		IPAERR("unsupported ip %d\n", ip);
+		IPAERR_RL("unsupported ip %d\n", ip);
 		return -EPERM;
 	}
 
@@ -2347,7 +2463,7 @@ int ipa_generate_flt_eq(enum ipa_ip_type ip,
 }
 
 /**
- * ipa_cfg_ep - IPA end-point configuration
+ * ipa2_cfg_ep - IPA end-point configuration
  * @clnt_hdl:	[in] opaque client handle assigned by IPA to client
  * @ipa_ep_cfg:	[in] IPA end-point configuration params
  *
@@ -2358,7 +2474,7 @@ int ipa_generate_flt_eq(enum ipa_ip_type ip,
  *
  * Note:	Should not be called from atomic context
  */
-int ipa_cfg_ep(u32 clnt_hdl, const struct ipa_ep_cfg *ipa_ep_cfg)
+int ipa2_cfg_ep(u32 clnt_hdl, const struct ipa_ep_cfg *ipa_ep_cfg)
 {
 	int result = -EINVAL;
 
@@ -2373,40 +2489,40 @@ int ipa_cfg_ep(u32 clnt_hdl, const struct ipa_ep_cfg *ipa_ep_cfg)
 		return -EINVAL;
 	}
 
-	result = ipa_cfg_ep_hdr(clnt_hdl, &ipa_ep_cfg->hdr);
+	result = ipa2_cfg_ep_hdr(clnt_hdl, &ipa_ep_cfg->hdr);
 	if (result)
 		return result;
 
-	result = ipa_cfg_ep_hdr_ext(clnt_hdl, &ipa_ep_cfg->hdr_ext);
+	result = ipa2_cfg_ep_hdr_ext(clnt_hdl, &ipa_ep_cfg->hdr_ext);
 	if (result)
 		return result;
 
-	result = ipa_cfg_ep_aggr(clnt_hdl, &ipa_ep_cfg->aggr);
+	result = ipa2_cfg_ep_aggr(clnt_hdl, &ipa_ep_cfg->aggr);
 	if (result)
 		return result;
 
-	result = ipa_cfg_ep_cfg(clnt_hdl, &ipa_ep_cfg->cfg);
+	result = ipa2_cfg_ep_cfg(clnt_hdl, &ipa_ep_cfg->cfg);
 	if (result)
 		return result;
 
 	if (IPA_CLIENT_IS_PROD(ipa_ctx->ep[clnt_hdl].client)) {
-		result = ipa_cfg_ep_nat(clnt_hdl, &ipa_ep_cfg->nat);
+		result = ipa2_cfg_ep_nat(clnt_hdl, &ipa_ep_cfg->nat);
 		if (result)
 			return result;
 
-		result = ipa_cfg_ep_mode(clnt_hdl, &ipa_ep_cfg->mode);
+		result = ipa2_cfg_ep_mode(clnt_hdl, &ipa_ep_cfg->mode);
 		if (result)
 			return result;
 
-		result = ipa_cfg_ep_route(clnt_hdl, &ipa_ep_cfg->route);
+		result = ipa2_cfg_ep_route(clnt_hdl, &ipa_ep_cfg->route);
 		if (result)
 			return result;
 
-		result = ipa_cfg_ep_deaggr(clnt_hdl, &ipa_ep_cfg->deaggr);
+		result = ipa2_cfg_ep_deaggr(clnt_hdl, &ipa_ep_cfg->deaggr);
 		if (result)
 			return result;
 	} else {
-		result = ipa_cfg_ep_metadata_mask(clnt_hdl,
+		result = ipa2_cfg_ep_metadata_mask(clnt_hdl,
 				&ipa_ep_cfg->metadata_mask);
 		if (result)
 			return result;
@@ -2414,7 +2530,6 @@ int ipa_cfg_ep(u32 clnt_hdl, const struct ipa_ep_cfg *ipa_ep_cfg)
 
 	return 0;
 }
-EXPORT_SYMBOL(ipa_cfg_ep);
 
 const char *ipa_get_nat_en_str(enum ipa_nat_en_type nat_en)
 {
@@ -2459,7 +2574,7 @@ void _ipa_cfg_ep_nat_v2_0(u32 clnt_hdl,
 }
 
 /**
- * ipa_cfg_ep_nat() - IPA end-point NAT configuration
+ * ipa2_cfg_ep_nat() - IPA end-point NAT configuration
  * @clnt_hdl:	[in] opaque client handle assigned by IPA to client
  * @ipa_ep_cfg:	[in] IPA end-point configuration params
  *
@@ -2467,7 +2582,7 @@ void _ipa_cfg_ep_nat_v2_0(u32 clnt_hdl,
  *
  * Note:	Should not be called from atomic context
  */
-int ipa_cfg_ep_nat(u32 clnt_hdl, const struct ipa_ep_cfg_nat *ep_nat)
+int ipa2_cfg_ep_nat(u32 clnt_hdl, const struct ipa_ep_cfg_nat *ep_nat)
 {
 	if (clnt_hdl >= ipa_ctx->ipa_num_pipes ||
 	    ipa_ctx->ep[clnt_hdl].valid == 0 || ep_nat == NULL) {
@@ -2490,15 +2605,14 @@ int ipa_cfg_ep_nat(u32 clnt_hdl, const struct ipa_ep_cfg_nat *ep_nat)
 	/* copy over EP cfg */
 	ipa_ctx->ep[clnt_hdl].cfg.nat = *ep_nat;
 
-	ipa_inc_client_enable_clks();
+	IPA_ACTIVE_CLIENTS_INC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	ipa_ctx->ctrl->ipa_cfg_ep_nat(clnt_hdl, ep_nat);
 
-	ipa_dec_client_disable_clks();
+	IPA_ACTIVE_CLIENTS_DEC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	return 0;
 }
-EXPORT_SYMBOL(ipa_cfg_ep_nat);
 
 static void _ipa_cfg_ep_status_v1_1(u32 clnt_hdl,
 				const struct ipa_ep_cfg_status *ep_status)
@@ -2525,7 +2639,7 @@ static void _ipa_cfg_ep_status_v2_0(u32 clnt_hdl,
 }
 
 /**
- * ipa_cfg_ep_status() - IPA end-point status configuration
+ * ipa2_cfg_ep_status() - IPA end-point status configuration
  * @clnt_hdl:	[in] opaque client handle assigned by IPA to client
  * @ipa_ep_cfg:	[in] IPA end-point configuration params
  *
@@ -2533,7 +2647,7 @@ static void _ipa_cfg_ep_status_v2_0(u32 clnt_hdl,
  *
  * Note:	Should not be called from atomic context
  */
-int ipa_cfg_ep_status(u32 clnt_hdl, const struct ipa_ep_cfg_status *ep_status)
+int ipa2_cfg_ep_status(u32 clnt_hdl, const struct ipa_ep_cfg_status *ep_status)
 {
 	if (clnt_hdl >= ipa_ctx->ipa_num_pipes ||
 	    ipa_ctx->ep[clnt_hdl].valid == 0 || ep_status == NULL) {
@@ -2551,11 +2665,11 @@ int ipa_cfg_ep_status(u32 clnt_hdl, const struct ipa_ep_cfg_status *ep_status)
 	/* copy over EP cfg */
 	ipa_ctx->ep[clnt_hdl].status = *ep_status;
 
-	ipa_inc_client_enable_clks();
+	IPA_ACTIVE_CLIENTS_INC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	ipa_ctx->ctrl->ipa_cfg_ep_status(clnt_hdl, ep_status);
 
-	ipa_dec_client_disable_clks();
+	IPA_ACTIVE_CLIENTS_DEC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	return 0;
 }
@@ -2586,7 +2700,7 @@ static void _ipa_cfg_ep_cfg_v2_0(u32 clnt_hdl,
 }
 
 /**
- * ipa_cfg_ep_cfg() - IPA end-point cfg configuration
+ * ipa2_cfg_ep_cfg() - IPA end-point cfg configuration
  * @clnt_hdl:	[in] opaque client handle assigned by IPA to client
  * @ipa_ep_cfg:	[in] IPA end-point configuration params
  *
@@ -2594,7 +2708,7 @@ static void _ipa_cfg_ep_cfg_v2_0(u32 clnt_hdl,
  *
  * Note:	Should not be called from atomic context
  */
-int ipa_cfg_ep_cfg(u32 clnt_hdl, const struct ipa_ep_cfg_cfg *cfg)
+int ipa2_cfg_ep_cfg(u32 clnt_hdl, const struct ipa_ep_cfg_cfg *cfg)
 {
 	if (clnt_hdl >= ipa_ctx->ipa_num_pipes ||
 	    ipa_ctx->ep[clnt_hdl].valid == 0 || cfg == NULL) {
@@ -2613,15 +2727,14 @@ int ipa_cfg_ep_cfg(u32 clnt_hdl, const struct ipa_ep_cfg_cfg *cfg)
 	/* copy over EP cfg */
 	ipa_ctx->ep[clnt_hdl].cfg.cfg = *cfg;
 
-	ipa_inc_client_enable_clks();
+	IPA_ACTIVE_CLIENTS_INC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	ipa_ctx->ctrl->ipa_cfg_ep_cfg(clnt_hdl, cfg);
 
-	ipa_dec_client_disable_clks();
+	IPA_ACTIVE_CLIENTS_DEC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	return 0;
 }
-EXPORT_SYMBOL(ipa_cfg_ep_cfg);
 
 static void _ipa_cfg_ep_metadata_mask_v1_1(u32 clnt_hdl,
 			const struct ipa_ep_cfg_metadata_mask *metadata_mask)
@@ -2644,7 +2757,7 @@ static void _ipa_cfg_ep_metadata_mask_v2_0(u32 clnt_hdl,
 }
 
 /**
- * ipa_cfg_ep_metadata_mask() - IPA end-point meta-data mask configuration
+ * ipa2_cfg_ep_metadata_mask() - IPA end-point meta-data mask configuration
  * @clnt_hdl:	[in] opaque client handle assigned by IPA to client
  * @ipa_ep_cfg:	[in] IPA end-point configuration params
  *
@@ -2652,8 +2765,8 @@ static void _ipa_cfg_ep_metadata_mask_v2_0(u32 clnt_hdl,
  *
  * Note:	Should not be called from atomic context
  */
-int ipa_cfg_ep_metadata_mask(u32 clnt_hdl, const struct ipa_ep_cfg_metadata_mask
-		*metadata_mask)
+int ipa2_cfg_ep_metadata_mask(u32 clnt_hdl,
+	const struct ipa_ep_cfg_metadata_mask *metadata_mask)
 {
 	if (clnt_hdl >= ipa_ctx->ipa_num_pipes ||
 	    ipa_ctx->ep[clnt_hdl].valid == 0 || metadata_mask == NULL) {
@@ -2670,15 +2783,14 @@ int ipa_cfg_ep_metadata_mask(u32 clnt_hdl, const struct ipa_ep_cfg_metadata_mask
 	/* copy over EP cfg */
 	ipa_ctx->ep[clnt_hdl].cfg.metadata_mask = *metadata_mask;
 
-	ipa_inc_client_enable_clks();
+	IPA_ACTIVE_CLIENTS_INC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	ipa_ctx->ctrl->ipa_cfg_ep_metadata_mask(clnt_hdl, metadata_mask);
 
-	ipa_dec_client_disable_clks();
+	IPA_ACTIVE_CLIENTS_DEC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	return 0;
 }
-EXPORT_SYMBOL(ipa_cfg_ep_metadata_mask);
 
 void _ipa_cfg_ep_hdr_v1_1(u32 pipe_number,
 		const struct ipa_ep_cfg_hdr *ep_hdr)
@@ -2756,7 +2868,7 @@ void _ipa_cfg_ep_hdr_v2_0(u32 pipe_number,
 }
 
 /**
- * ipa_cfg_ep_hdr() -  IPA end-point header configuration
+ * ipa2_cfg_ep_hdr() -  IPA end-point header configuration
  * @clnt_hdl:	[in] opaque client handle assigned by IPA to client
  * @ipa_ep_cfg:	[in] IPA end-point configuration params
  *
@@ -2764,7 +2876,7 @@ void _ipa_cfg_ep_hdr_v2_0(u32 pipe_number,
  *
  * Note:	Should not be called from atomic context
  */
-int ipa_cfg_ep_hdr(u32 clnt_hdl, const struct ipa_ep_cfg_hdr *ep_hdr)
+int ipa2_cfg_ep_hdr(u32 clnt_hdl, const struct ipa_ep_cfg_hdr *ep_hdr)
 {
 	struct ipa_ep_context *ep;
 
@@ -2794,15 +2906,14 @@ int ipa_cfg_ep_hdr(u32 clnt_hdl, const struct ipa_ep_cfg_hdr *ep_hdr)
 	/* copy over EP cfg */
 	ep->cfg.hdr = *ep_hdr;
 
-	ipa_inc_client_enable_clks();
+	IPA_ACTIVE_CLIENTS_INC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	ipa_ctx->ctrl->ipa_cfg_ep_hdr(clnt_hdl, &ep->cfg.hdr);
 
-	ipa_dec_client_disable_clks();
+	IPA_ACTIVE_CLIENTS_DEC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	return 0;
 }
-EXPORT_SYMBOL(ipa_cfg_ep_hdr);
 
 static int _ipa_cfg_ep_hdr_ext_v1_1(u32 clnt_hdl,
 				const struct ipa_ep_cfg_hdr_ext *ep_hdr)
@@ -2881,7 +2992,7 @@ static int _ipa_cfg_ep_hdr_ext_v2_6L(u32 clnt_hdl,
 }
 
 /**
- * ipa_cfg_ep_hdr_ext() -  IPA end-point extended header configuration
+ * ipa2_cfg_ep_hdr_ext() -  IPA end-point extended header configuration
  * @clnt_hdl:	[in] opaque client handle assigned by IPA to client
  * @ep_hdr_ext:	[in] IPA end-point configuration params
  *
@@ -2889,7 +3000,7 @@ static int _ipa_cfg_ep_hdr_ext_v2_6L(u32 clnt_hdl,
  *
  * Note:	Should not be called from atomic context
  */
-int ipa_cfg_ep_hdr_ext(u32 clnt_hdl,
+int ipa2_cfg_ep_hdr_ext(u32 clnt_hdl,
 		       const struct ipa_ep_cfg_hdr_ext *ep_hdr_ext)
 {
 	struct ipa_ep_context *ep;
@@ -2921,24 +3032,23 @@ int ipa_cfg_ep_hdr_ext(u32 clnt_hdl,
 	/* copy over EP cfg */
 	ep->cfg.hdr_ext = *ep_hdr_ext;
 
-	ipa_inc_client_enable_clks();
+	IPA_ACTIVE_CLIENTS_INC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	ipa_ctx->ctrl->ipa_cfg_ep_hdr_ext(clnt_hdl, &ep->cfg.hdr_ext);
 
-	ipa_dec_client_disable_clks();
+	IPA_ACTIVE_CLIENTS_DEC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	return 0;
 }
-EXPORT_SYMBOL(ipa_cfg_ep_hdr_ext);
 
 /**
- * ipa_cfg_ep_hdr() -  IPA end-point Control configuration
+ * ipa2_cfg_ep_hdr() -  IPA end-point Control configuration
  * @clnt_hdl:	[in] opaque client handle assigned by IPA to client
  * @ipa_ep_cfg_ctrl:	[in] IPA end-point configuration params
  *
  * Returns:	0 on success, negative on failure
  */
-int ipa_cfg_ep_ctrl(u32 clnt_hdl, const struct ipa_ep_cfg_ctrl *ep_ctrl)
+int ipa2_cfg_ep_ctrl(u32 clnt_hdl, const struct ipa_ep_cfg_ctrl *ep_ctrl)
 {
 	u32 reg_val = 0;
 
@@ -2966,7 +3076,6 @@ int ipa_cfg_ep_ctrl(u32 clnt_hdl, const struct ipa_ep_cfg_ctrl *ep_ctrl)
 	return 0;
 
 }
-EXPORT_SYMBOL(ipa_cfg_ep_ctrl);
 
 /**
  * ipa_cfg_aggr_cntr_granularity() - granularity of the AGGR timer configuration
@@ -3088,7 +3197,7 @@ void _ipa_cfg_ep_mode_v2_0(u32 pipe_number, u32 dst_pipe_number,
 }
 
 /**
- * ipa_cfg_ep_mode() - IPA end-point mode configuration
+ * ipa2_cfg_ep_mode() - IPA end-point mode configuration
  * @clnt_hdl:	[in] opaque client handle assigned by IPA to client
  * @ipa_ep_cfg:	[in] IPA end-point configuration params
  *
@@ -3096,7 +3205,7 @@ void _ipa_cfg_ep_mode_v2_0(u32 pipe_number, u32 dst_pipe_number,
  *
  * Note:	Should not be called from atomic context
  */
-int ipa_cfg_ep_mode(u32 clnt_hdl, const struct ipa_ep_cfg_mode *ep_mode)
+int ipa2_cfg_ep_mode(u32 clnt_hdl, const struct ipa_ep_cfg_mode *ep_mode)
 {
 	int ep;
 
@@ -3117,7 +3226,7 @@ int ipa_cfg_ep_mode(u32 clnt_hdl, const struct ipa_ep_cfg_mode *ep_mode)
 		return -EINVAL;
 	}
 
-	ep = ipa_get_ep_mapping(ep_mode->dst);
+	ep = ipa2_get_ep_mapping(ep_mode->dst);
 	if (ep == -1 && ep_mode->mode == IPA_DMA) {
 		IPAERR("dst %d does not exist\n", ep_mode->dst);
 		return -EINVAL;
@@ -3126,7 +3235,7 @@ int ipa_cfg_ep_mode(u32 clnt_hdl, const struct ipa_ep_cfg_mode *ep_mode)
 	WARN_ON(ep_mode->mode == IPA_DMA && IPA_CLIENT_IS_PROD(ep_mode->dst));
 
 	if (!IPA_CLIENT_IS_CONS(ep_mode->dst))
-		ep = ipa_get_ep_mapping(IPA_CLIENT_APPS_LAN_CONS);
+		ep = ipa2_get_ep_mapping(IPA_CLIENT_APPS_LAN_CONS);
 
 	IPADBG("pipe=%d mode=%d(%s), dst_client_number=%d",
 			clnt_hdl,
@@ -3138,17 +3247,16 @@ int ipa_cfg_ep_mode(u32 clnt_hdl, const struct ipa_ep_cfg_mode *ep_mode)
 	ipa_ctx->ep[clnt_hdl].cfg.mode = *ep_mode;
 	ipa_ctx->ep[clnt_hdl].dst_pipe_index = ep;
 
-	ipa_inc_client_enable_clks();
+	IPA_ACTIVE_CLIENTS_INC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	ipa_ctx->ctrl->ipa_cfg_ep_mode(clnt_hdl,
 			ipa_ctx->ep[clnt_hdl].dst_pipe_index,
 			ep_mode);
 
-	ipa_dec_client_disable_clks();
+	IPA_ACTIVE_CLIENTS_DEC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	return 0;
 }
-EXPORT_SYMBOL(ipa_cfg_ep_mode);
 
 const char *get_aggr_enable_str(enum ipa_aggr_en_type aggr_en)
 {
@@ -3233,12 +3341,16 @@ void _ipa_cfg_ep_aggr_v2_0(u32 pipe_number,
 			IPA_ENDP_INIT_AGGR_n_AGGR_PKT_LIMIT_SHFT,
 			IPA_ENDP_INIT_AGGR_n_AGGR_PKT_LIMIT_BMSK);
 
+	IPA_SETFIELD_IN_REG(reg_val, ep_aggr->aggr_sw_eof_active,
+			IPA_ENDP_INIT_AGGR_n_AGGR_SW_EOF_ACTIVE_SHFT,
+			IPA_ENDP_INIT_AGGR_n_AGGR_SW_EOF_ACTIVE_BMSK);
+
 	ipa_write_reg(ipa_ctx->mmio,
 			IPA_ENDP_INIT_AGGR_N_OFST_v2_0(pipe_number), reg_val);
 }
 
 /**
- * ipa_cfg_ep_aggr() - IPA end-point aggregation configuration
+ * ipa2_cfg_ep_aggr() - IPA end-point aggregation configuration
  * @clnt_hdl:	[in] opaque client handle assigned by IPA to client
  * @ipa_ep_cfg:	[in] IPA end-point configuration params
  *
@@ -3246,7 +3358,7 @@ void _ipa_cfg_ep_aggr_v2_0(u32 pipe_number,
  *
  * Note:	Should not be called from atomic context
  */
-int ipa_cfg_ep_aggr(u32 clnt_hdl, const struct ipa_ep_cfg_aggr *ep_aggr)
+int ipa2_cfg_ep_aggr(u32 clnt_hdl, const struct ipa_ep_cfg_aggr *ep_aggr)
 {
 	if (clnt_hdl >= ipa_ctx->ipa_num_pipes ||
 	    ipa_ctx->ep[clnt_hdl].valid == 0 || ep_aggr == NULL) {
@@ -3267,15 +3379,14 @@ int ipa_cfg_ep_aggr(u32 clnt_hdl, const struct ipa_ep_cfg_aggr *ep_aggr)
 	/* copy over EP cfg */
 	ipa_ctx->ep[clnt_hdl].cfg.aggr = *ep_aggr;
 
-	ipa_inc_client_enable_clks();
+	IPA_ACTIVE_CLIENTS_INC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	ipa_ctx->ctrl->ipa_cfg_ep_aggr(clnt_hdl, ep_aggr);
 
-	ipa_dec_client_disable_clks();
+	IPA_ACTIVE_CLIENTS_DEC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	return 0;
 }
-EXPORT_SYMBOL(ipa_cfg_ep_aggr);
 
 void _ipa_cfg_ep_route_v1_1(u32 pipe_index, u32 rt_tbl_index)
 {
@@ -3304,7 +3415,7 @@ void _ipa_cfg_ep_route_v2_0(u32 pipe_index, u32 rt_tbl_index)
 }
 
 /**
- * ipa_cfg_ep_route() - IPA end-point routing configuration
+ * ipa2_cfg_ep_route() - IPA end-point routing configuration
  * @clnt_hdl:	[in] opaque client handle assigned by IPA to client
  * @ipa_ep_cfg:	[in] IPA end-point configuration params
  *
@@ -3312,7 +3423,7 @@ void _ipa_cfg_ep_route_v2_0(u32 pipe_index, u32 rt_tbl_index)
  *
  * Note:	Should not be called from atomic context
  */
-int ipa_cfg_ep_route(u32 clnt_hdl, const struct ipa_ep_cfg_route *ep_route)
+int ipa2_cfg_ep_route(u32 clnt_hdl, const struct ipa_ep_cfg_route *ep_route)
 {
 	if (clnt_hdl >= ipa_ctx->ipa_num_pipes ||
 	    ipa_ctx->ep[clnt_hdl].valid == 0 || ep_route == NULL) {
@@ -3351,16 +3462,15 @@ int ipa_cfg_ep_route(u32 clnt_hdl, const struct ipa_ep_cfg_route *ep_route)
 	else
 		ipa_ctx->ep[clnt_hdl].rt_tbl_idx = 0;
 
-	ipa_inc_client_enable_clks();
+	IPA_ACTIVE_CLIENTS_INC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	ipa_ctx->ctrl->ipa_cfg_ep_route(clnt_hdl,
 			ipa_ctx->ep[clnt_hdl].rt_tbl_idx);
 
-	ipa_dec_client_disable_clks();
+	IPA_ACTIVE_CLIENTS_DEC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	return 0;
 }
-EXPORT_SYMBOL(ipa_cfg_ep_route);
 
 void _ipa_cfg_ep_holb_v1_1(u32 pipe_number,
 			const struct ipa_ep_cfg_holb *ep_holb)
@@ -3411,7 +3521,7 @@ void _ipa_cfg_ep_holb_v2_6L(u32 pipe_number,
 }
 
 /**
- * ipa_cfg_ep_holb() - IPA end-point holb configuration
+ * ipa2_cfg_ep_holb() - IPA end-point holb configuration
  *
  * If an IPA producer pipe is full, IPA HW by default will block
  * indefinitely till space opens up. During this time no packets
@@ -3424,7 +3534,7 @@ void _ipa_cfg_ep_holb_v2_6L(u32 pipe_number,
  *
  * Returns:	0 on success, negative on failure
  */
-int ipa_cfg_ep_holb(u32 clnt_hdl, const struct ipa_ep_cfg_holb *ep_holb)
+int ipa2_cfg_ep_holb(u32 clnt_hdl, const struct ipa_ep_cfg_holb *ep_holb)
 {
 	if (clnt_hdl >= ipa_ctx->ipa_num_pipes ||
 	    ipa_ctx->ep[clnt_hdl].valid == 0 || ep_holb == NULL ||
@@ -3446,21 +3556,20 @@ int ipa_cfg_ep_holb(u32 clnt_hdl, const struct ipa_ep_cfg_holb *ep_holb)
 
 	ipa_ctx->ep[clnt_hdl].holb = *ep_holb;
 
-	ipa_inc_client_enable_clks();
+	IPA_ACTIVE_CLIENTS_INC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	ipa_ctx->ctrl->ipa_cfg_ep_holb(clnt_hdl, ep_holb);
 
-	ipa_dec_client_disable_clks();
+	IPA_ACTIVE_CLIENTS_DEC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	IPADBG("cfg holb %u ep=%d tmr=%d\n", ep_holb->en, clnt_hdl,
 				ep_holb->tmr_val);
 
 	return 0;
 }
-EXPORT_SYMBOL(ipa_cfg_ep_holb);
 
 /**
- * ipa_cfg_ep_holb_by_client() - IPA end-point holb configuration
+ * ipa2_cfg_ep_holb_by_client() - IPA end-point holb configuration
  *
  * Wrapper function for ipa_cfg_ep_holb() with client name instead of
  * client handle. This function is used for clients that does not have
@@ -3471,12 +3580,11 @@ EXPORT_SYMBOL(ipa_cfg_ep_holb);
  *
  * Returns:	0 on success, negative on failure
  */
-int ipa_cfg_ep_holb_by_client(enum ipa_client_type client,
+int ipa2_cfg_ep_holb_by_client(enum ipa_client_type client,
 				const struct ipa_ep_cfg_holb *ep_holb)
 {
-	return ipa_cfg_ep_holb(ipa_get_ep_mapping(client), ep_holb);
+	return ipa2_cfg_ep_holb(ipa2_get_ep_mapping(client), ep_holb);
 }
-EXPORT_SYMBOL(ipa_cfg_ep_holb_by_client);
 
 static int _ipa_cfg_ep_deaggr_v1_1(u32 clnt_hdl,
 				const struct ipa_ep_cfg_deaggr *ep_deaggr)
@@ -3513,7 +3621,7 @@ static int _ipa_cfg_ep_deaggr_v2_0(u32 clnt_hdl,
 }
 
 /**
- * ipa_cfg_ep_deaggr() -  IPA end-point deaggregation configuration
+ * ipa2_cfg_ep_deaggr() -  IPA end-point deaggregation configuration
  * @clnt_hdl:	[in] opaque client handle assigned by IPA to client
  * @ep_deaggr:	[in] IPA end-point configuration params
  *
@@ -3521,7 +3629,7 @@ static int _ipa_cfg_ep_deaggr_v2_0(u32 clnt_hdl,
  *
  * Note:	Should not be called from atomic context
  */
-int ipa_cfg_ep_deaggr(u32 clnt_hdl,
+int ipa2_cfg_ep_deaggr(u32 clnt_hdl,
 			const struct ipa_ep_cfg_deaggr *ep_deaggr)
 {
 	struct ipa_ep_context *ep;
@@ -3549,15 +3657,14 @@ int ipa_cfg_ep_deaggr(u32 clnt_hdl,
 	/* copy over EP cfg */
 	ep->cfg.deaggr = *ep_deaggr;
 
-	ipa_inc_client_enable_clks();
+	IPA_ACTIVE_CLIENTS_INC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	ipa_ctx->ctrl->ipa_cfg_ep_deaggr(clnt_hdl, &ep->cfg.deaggr);
 
-	ipa_dec_client_disable_clks();
+	IPA_ACTIVE_CLIENTS_DEC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	return 0;
 }
-EXPORT_SYMBOL(ipa_cfg_ep_deaggr);
 
 static void _ipa_cfg_ep_metadata_v1_1(u32 pipe_number,
 					const struct ipa_ep_cfg_metadata *meta)
@@ -3580,7 +3687,7 @@ static void _ipa_cfg_ep_metadata_v2_0(u32 pipe_number,
 }
 
 /**
- * ipa_cfg_ep_metadata() - IPA end-point metadata configuration
+ * ipa2_cfg_ep_metadata() - IPA end-point metadata configuration
  * @clnt_hdl:	[in] opaque client handle assigned by IPA to client
  * @ipa_ep_cfg:	[in] IPA end-point configuration params
  *
@@ -3588,7 +3695,7 @@ static void _ipa_cfg_ep_metadata_v2_0(u32 pipe_number,
  *
  * Note:	Should not be called from atomic context
  */
-int ipa_cfg_ep_metadata(u32 clnt_hdl, const struct ipa_ep_cfg_metadata *ep_md)
+int ipa2_cfg_ep_metadata(u32 clnt_hdl, const struct ipa_ep_cfg_metadata *ep_md)
 {
 	if (clnt_hdl >= ipa_ctx->ipa_num_pipes ||
 		ipa_ctx->ep[clnt_hdl].valid == 0 || ep_md == NULL) {
@@ -3602,19 +3709,19 @@ int ipa_cfg_ep_metadata(u32 clnt_hdl, const struct ipa_ep_cfg_metadata *ep_md)
 	/* copy over EP cfg */
 	ipa_ctx->ep[clnt_hdl].cfg.meta = *ep_md;
 
-	ipa_inc_client_enable_clks();
+	IPA_ACTIVE_CLIENTS_INC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	ipa_ctx->ctrl->ipa_cfg_ep_metadata(clnt_hdl, ep_md);
 	ipa_ctx->ep[clnt_hdl].cfg.hdr.hdr_metadata_reg_valid = 1;
 	ipa_ctx->ctrl->ipa_cfg_ep_hdr(clnt_hdl, &ipa_ctx->ep[clnt_hdl].cfg.hdr);
 
-	ipa_dec_client_disable_clks();
+	IPA_ACTIVE_CLIENTS_DEC_EP(ipa2_get_client_mapping(clnt_hdl));
 
 	return 0;
 }
-EXPORT_SYMBOL(ipa_cfg_ep_metadata);
+EXPORT_SYMBOL(ipa2_cfg_ep_metadata);
 
-int ipa_write_qmap_id(struct ipa_ioc_write_qmapid *param_in)
+int ipa2_write_qmap_id(struct ipa_ioc_write_qmapid *param_in)
 {
 	struct ipa_ep_cfg_metadata meta;
 	struct ipa_ep_context *ep;
@@ -3631,7 +3738,7 @@ int ipa_write_qmap_id(struct ipa_ioc_write_qmapid *param_in)
 		goto fail;
 	}
 
-	ipa_ep_idx = ipa_get_ep_mapping(param_in->client);
+	ipa_ep_idx = ipa2_get_ep_mapping(param_in->client);
 	if (ipa_ep_idx == -1) {
 		IPAERR_RL("Invalid client.\n");
 		goto fail;
@@ -3646,8 +3753,9 @@ int ipa_write_qmap_id(struct ipa_ioc_write_qmapid *param_in)
 	meta.qmap_id = param_in->qmap_id;
 	if (param_in->client == IPA_CLIENT_USB_PROD ||
 	    param_in->client == IPA_CLIENT_HSIC1_PROD ||
-	    param_in->client == IPA_CLIENT_ODU_PROD) {
-		result = ipa_cfg_ep_metadata(ipa_ep_idx, &meta);
+	    param_in->client == IPA_CLIENT_ODU_PROD ||
+	    param_in->client == IPA_CLIENT_ETHERNET_PROD) {
+		result = ipa2_cfg_ep_metadata(ipa_ep_idx, &meta);
 	} else if (param_in->client == IPA_CLIENT_WLAN1_PROD) {
 		ipa_ctx->ep[ipa_ep_idx].cfg.meta = meta;
 		result = ipa_write_qmapid_wdi_pipe(ipa_ep_idx, meta.qmap_id);
@@ -3680,6 +3788,30 @@ void ipa_dump_buff_internal(void *base, dma_addr_t phy_base, u32 size)
 				byt[0], byt[1], byt[2], byt[3]);
 	}
 	IPADBG("END\n");
+}
+
+/**
+ * void ipa_rx_timeout_min_max_calc() - calc min max timeout time of rx polling
+ * @time: time fom dtsi entry or from debugfs file system
+ * @min: rx polling min timeout
+ * @max: rx polling max timeout
+ * Maximum time could be of 10Msec allowed.
+ */
+void ipa_rx_timeout_min_max_calc(u32 *min, u32 *max, s8 time)
+{
+	if ((time >= MIN_RX_POLL_TIME) &&
+		(time <= MAX_RX_POLL_TIME)) {
+		*min = (time * MSEC) + LOWER_CUTOFF;
+		*max = (time * MSEC) + UPPER_CUTOFF;
+	} else {
+		/* Setting up the default min max time */
+		IPADBG("Setting up default rx polling timeout\n");
+		*min = (MIN_RX_POLL_TIME * MSEC) +
+			LOWER_CUTOFF;
+		*max = (MIN_RX_POLL_TIME * MSEC) +
+			UPPER_CUTOFF;
+	}
+	IPADBG("Rx polling timeout Min = %u len = %u\n", *min, *max);
 }
 
 /**
@@ -3780,28 +3912,27 @@ int ipa_pipe_mem_free(u32 ofst, u32 size)
 }
 
 /**
- * ipa_set_aggr_mode() - Set the aggregation mode which is a global setting
+ * ipa2_set_aggr_mode() - Set the aggregation mode which is a global setting
  * @mode:	[in] the desired aggregation mode for e.g. straight MBIM, QCNCM,
  * etc
  *
  * Returns:	0 on success
  */
-int ipa_set_aggr_mode(enum ipa_aggr_mode mode)
+int ipa2_set_aggr_mode(enum ipa_aggr_mode mode)
 {
 	u32 reg_val;
 
-	ipa_inc_client_enable_clks();
+	IPA_ACTIVE_CLIENTS_INC_SIMPLE();
 	reg_val = ipa_read_reg(ipa_ctx->mmio, IPA_QCNCM_OFST);
 	ipa_write_reg(ipa_ctx->mmio, IPA_QCNCM_OFST, (mode & 0x1) |
 			(reg_val & 0xfffffffe));
-	ipa_dec_client_disable_clks();
+	IPA_ACTIVE_CLIENTS_DEC_SIMPLE();
 
 	return 0;
 }
-EXPORT_SYMBOL(ipa_set_aggr_mode);
 
 /**
- * ipa_set_qcncm_ndp_sig() - Set the NDP signature used for QCNCM aggregation
+ * ipa2_set_qcncm_ndp_sig() - Set the NDP signature used for QCNCM aggregation
  * mode
  * @sig:	[in] the first 3 bytes of QCNCM NDP signature (expected to be
  * "QND")
@@ -3811,7 +3942,7 @@ EXPORT_SYMBOL(ipa_set_aggr_mode);
  *
  * Returns:	0 on success, negative on failure
  */
-int ipa_set_qcncm_ndp_sig(char sig[3])
+int ipa2_set_qcncm_ndp_sig(char sig[3])
 {
 	u32 reg_val;
 
@@ -3819,37 +3950,35 @@ int ipa_set_qcncm_ndp_sig(char sig[3])
 		IPAERR("bad argument for ipa_set_qcncm_ndp_sig/n");
 		return -EINVAL;
 	}
-	ipa_inc_client_enable_clks();
+	IPA_ACTIVE_CLIENTS_INC_SIMPLE();
 	reg_val = ipa_read_reg(ipa_ctx->mmio, IPA_QCNCM_OFST);
 	ipa_write_reg(ipa_ctx->mmio, IPA_QCNCM_OFST, sig[0] << 20 |
 			(sig[1] << 12) | (sig[2] << 4) |
 			(reg_val & 0xf000000f));
-	ipa_dec_client_disable_clks();
+	IPA_ACTIVE_CLIENTS_DEC_SIMPLE();
 
 	return 0;
 }
-EXPORT_SYMBOL(ipa_set_qcncm_ndp_sig);
 
 /**
- * ipa_set_single_ndp_per_mbim() - Enable/disable single NDP per MBIM frame
+ * ipa2_set_single_ndp_per_mbim() - Enable/disable single NDP per MBIM frame
  * configuration
  * @enable:	[in] true for single NDP/MBIM; false otherwise
  *
  * Returns:	0 on success
  */
-int ipa_set_single_ndp_per_mbim(bool enable)
+int ipa2_set_single_ndp_per_mbim(bool enable)
 {
 	u32 reg_val;
 
-	ipa_inc_client_enable_clks();
+	IPA_ACTIVE_CLIENTS_INC_SIMPLE();
 	reg_val = ipa_read_reg(ipa_ctx->mmio, IPA_SINGLE_NDP_MODE_OFST);
 	ipa_write_reg(ipa_ctx->mmio, IPA_SINGLE_NDP_MODE_OFST,
 			(enable & 0x1) | (reg_val & 0xfffffffe));
-	ipa_dec_client_disable_clks();
+	IPA_ACTIVE_CLIENTS_DEC_SIMPLE();
 
 	return 0;
 }
-EXPORT_SYMBOL(ipa_set_single_ndp_per_mbim);
 
 /**
  * ipa_set_hw_timer_fix_for_mbim_aggr() - Enable/disable HW timer fix
@@ -3862,12 +3991,12 @@ int ipa_set_hw_timer_fix_for_mbim_aggr(bool enable)
 {
 	u32 reg_val;
 
-	ipa_inc_client_enable_clks();
+	IPA_ACTIVE_CLIENTS_INC_SIMPLE();
 	reg_val = ipa_read_reg(ipa_ctx->mmio, IPA_AGGREGATION_SPARE_REG_1_OFST);
 	ipa_write_reg(ipa_ctx->mmio, IPA_AGGREGATION_SPARE_REG_1_OFST,
 		(enable << IPA_AGGREGATION_HW_TIMER_FIX_MBIM_AGGR_SHFT) |
 		(reg_val & ~IPA_AGGREGATION_HW_TIMER_FIX_MBIM_AGGR_BMSK));
-	ipa_dec_client_disable_clks();
+	IPA_ACTIVE_CLIENTS_DEC_SIMPLE();
 	return 0;
 }
 EXPORT_SYMBOL(ipa_set_hw_timer_fix_for_mbim_aggr);
@@ -3902,16 +4031,15 @@ int ipa_straddle_boundary(u32 start, u32 end, u32 boundary)
 }
 
 /**
- * ipa_bam_reg_dump() - Dump selected BAM registers for IPA and DMA-BAM
+ * ipa2_bam_reg_dump() - Dump selected BAM registers for IPA and DMA-BAM
  *
  * Function is rate limited to avoid flooding kernel log buffer
  */
-void ipa_bam_reg_dump(void)
+void ipa2_bam_reg_dump(void)
 {
 	static DEFINE_RATELIMIT_STATE(_rs, 500*HZ, 1);
-
 	if (__ratelimit(&_rs)) {
-		ipa_inc_client_enable_clks();
+		IPA_ACTIVE_CLIENTS_INC_SIMPLE();
 		pr_err("IPA BAM START\n");
 		if (ipa_ctx->ipa_hw_type < IPA_HW_v2_0) {
 			sps_get_bam_debug_info(ipa_ctx->bam_handle, 5,
@@ -3925,10 +4053,9 @@ void ipa_bam_reg_dump(void)
 			SPS_BAM_PIPE(ipa_get_ep_mapping(IPA_CLIENT_USB_PROD))),
 			0, 2);
 		}
-		ipa_dec_client_disable_clks();
+		IPA_ACTIVE_CLIENTS_DEC_SIMPLE();
 	}
 }
-EXPORT_SYMBOL(ipa_bam_reg_dump);
 
 static void ipa_init_mem_partition_v2(void)
 {
@@ -4503,6 +4630,8 @@ int ipa_tag_process(struct ipa_desc desc[],
 	int res;
 	struct ipa_tag_completion *comp;
 	int ep_idx;
+	u32 retry_cnt = 0;
+	gfp_t flag = GFP_KERNEL | (ipa_ctx->use_dma_zone ? GFP_DMA : 0);
 
 	/* Not enough room for the required descriptors for the tag process */
 	if (IPA_TAG_MAX_DESC - descs_num < REQUIRED_TAG_PROCESS_DESCRIPTORS) {
@@ -4512,7 +4641,7 @@ int ipa_tag_process(struct ipa_desc desc[],
 		return -ENOMEM;
 	}
 
-	ep_idx = ipa_get_ep_mapping(IPA_CLIENT_APPS_CMD_PROD);
+	ep_idx = ipa2_get_ep_mapping(IPA_CLIENT_APPS_CMD_PROD);
 	if (-1 == ep_idx) {
 		IPAERR("Client %u is not mapped\n",
 			IPA_CLIENT_APPS_CMD_PROD);
@@ -4520,7 +4649,7 @@ int ipa_tag_process(struct ipa_desc desc[],
 	}
 	sys = ipa_ctx->ep[ep_idx].sys;
 
-	tag_desc = kzalloc(sizeof(*tag_desc) * IPA_TAG_MAX_DESC, GFP_KERNEL);
+	tag_desc = kzalloc(sizeof(*tag_desc) * IPA_TAG_MAX_DESC, flag);
 	if (!tag_desc) {
 		IPAERR("failed to allocate memory\n");
 		res = -ENOMEM;
@@ -4528,7 +4657,7 @@ int ipa_tag_process(struct ipa_desc desc[],
 	}
 
 	/* IP_PACKET_INIT IC for tag status to be sent to apps */
-	pkt_init = kzalloc(sizeof(*pkt_init), GFP_KERNEL);
+	pkt_init = kzalloc(sizeof(*pkt_init), flag);
 	if (!pkt_init) {
 		IPAERR("failed to allocate memory\n");
 		res = -ENOMEM;
@@ -4536,7 +4665,7 @@ int ipa_tag_process(struct ipa_desc desc[],
 	}
 
 	pkt_init->destination_pipe_index =
-		ipa_get_ep_mapping(IPA_CLIENT_APPS_LAN_CONS);
+		ipa2_get_ep_mapping(IPA_CLIENT_APPS_LAN_CONS);
 
 	tag_desc[desc_idx].opcode = IPA_IP_PACKET_INIT;
 	tag_desc[desc_idx].pyld = pkt_init;
@@ -4547,7 +4676,7 @@ int ipa_tag_process(struct ipa_desc desc[],
 	desc_idx++;
 
 	/* NO-OP IC for ensuring that IPA pipeline is empty */
-	reg_write_nop = kzalloc(sizeof(*reg_write_nop), GFP_KERNEL);
+	reg_write_nop = kzalloc(sizeof(*reg_write_nop), flag);
 	if (!reg_write_nop) {
 		IPAERR("no mem\n");
 		res = -ENOMEM;
@@ -4566,7 +4695,7 @@ int ipa_tag_process(struct ipa_desc desc[],
 	desc_idx++;
 
 	/* status IC */
-	status = kzalloc(sizeof(*status), GFP_KERNEL);
+	status = kzalloc(sizeof(*status), flag);
 	if (!status) {
 		IPAERR("no mem\n");
 		res = -ENOMEM;
@@ -4602,7 +4731,7 @@ int ipa_tag_process(struct ipa_desc desc[],
 	atomic_set(&comp->cnt, 2);
 
 	/* dummy packet to send to IPA. packet payload is a completion object */
-	dummy_skb = alloc_skb(sizeof(comp), GFP_KERNEL);
+	dummy_skb = alloc_skb(sizeof(comp), flag);
 	if (!dummy_skb) {
 		IPAERR("failed to allocate memory\n");
 		res = -ENOMEM;
@@ -4618,9 +4747,22 @@ int ipa_tag_process(struct ipa_desc desc[],
 	tag_desc[desc_idx].user1 = dummy_skb;
 	desc_idx++;
 
+retry_alloc:
+
 	/* send all descriptors to IPA with single EOT */
 	res = ipa_send(sys, desc_idx, tag_desc, true);
 	if (res) {
+		if (res == -ENOMEM) {
+			if (retry_cnt < MAX_RETRY_ALLOC) {
+				IPADBG(
+				"Failed to alloc memory retry count %d\n",
+				retry_cnt);
+				retry_cnt++;
+				usleep_range(ALLOC_MIN_SLEEP_RX,
+					ALLOC_MAX_SLEEP_RX);
+				goto retry_alloc;
+			}
+		}
 		IPAERR("failed to send TAG packets %d\n", res);
 		res = -ENOMEM;
 		goto fail_send;
@@ -4793,23 +4935,22 @@ fail_free_desc:
 }
 
 /**
- * ipa_is_ready() - check if IPA module was initialized
+ * ipa2_is_ready() - check if IPA module was initialized
  * successfully
  *
  * Return value: true for yes; false for no
  */
-bool ipa_is_ready(void)
+bool ipa2_is_ready(void)
 {
 	return (ipa_ctx != NULL) ? true : false;
 }
-EXPORT_SYMBOL(ipa_is_ready);
 
 /**
- * ipa_is_client_handle_valid() - check if IPA client handle is valid handle
+ * ipa2_is_client_handle_valid() - check if IPA client handle is valid handle
  *
  * Return value: true for yes; false for no
  */
-bool ipa_is_client_handle_valid(u32 clnt_hdl)
+bool ipa2_is_client_handle_valid(u32 clnt_hdl)
 {
 	if (unlikely(!ipa_ctx)) {
 		IPAERR("IPA driver was not initialized\n");
@@ -4820,56 +4961,40 @@ bool ipa_is_client_handle_valid(u32 clnt_hdl)
 		return true;
 	return false;
 }
-EXPORT_SYMBOL(ipa_is_client_handle_valid);
 
 /**
- * ipa_proxy_clk_unvote() - called to remove IPA clock proxy vote
+ * ipa2_proxy_clk_unvote() - called to remove IPA clock proxy vote
  *
  * Return value: none
  */
-void ipa_proxy_clk_unvote(void)
+void ipa2_proxy_clk_unvote(void)
 {
-	if (ipa_is_ready() && ipa_ctx->q6_proxy_clk_vote_valid) {
-		ipa_dec_client_disable_clks();
+	if (ipa2_is_ready() && ipa_ctx->q6_proxy_clk_vote_valid) {
+		IPA_ACTIVE_CLIENTS_DEC_SPECIAL("PROXY_CLK_VOTE");
 		ipa_ctx->q6_proxy_clk_vote_valid = false;
 	}
 }
-EXPORT_SYMBOL(ipa_proxy_clk_unvote);
 
 /**
- * ipa_proxy_clk_vote() - called to add IPA clock proxy vote
+ * ipa2_proxy_clk_vote() - called to add IPA clock proxy vote
  *
  * Return value: none
  */
-void ipa_proxy_clk_vote(void)
+void ipa2_proxy_clk_vote(void)
 {
-	if (ipa_is_ready() && !ipa_ctx->q6_proxy_clk_vote_valid) {
-		ipa_inc_client_enable_clks();
+	if (ipa2_is_ready() && !ipa_ctx->q6_proxy_clk_vote_valid) {
+		IPA_ACTIVE_CLIENTS_INC_SPECIAL("PROXY_CLK_VOTE");
 		ipa_ctx->q6_proxy_clk_vote_valid = true;
 	}
 }
-EXPORT_SYMBOL(ipa_proxy_clk_vote);
+
 
 /**
- * ipa_get_hw_type() - Return IPA HW version
- *
- * Return value: enum ipa_hw_type
- */
-enum ipa_hw_type ipa_get_hw_type(void)
-{
-	if (ipa_ctx)
-		return ipa_ctx->ipa_hw_type;
-	else
-		return IPA_HW_None;
-}
-EXPORT_SYMBOL(ipa_get_hw_type);
-
-/**
- * ipa_get_smem_restr_bytes()- Return IPA smem restricted bytes
+ * ipa2_get_smem_restr_bytes()- Return IPA smem restricted bytes
  *
  * Return value: u16 - number of IPA smem restricted bytes
  */
-u16 ipa_get_smem_restr_bytes(void)
+u16 ipa2_get_smem_restr_bytes(void)
 {
 	if (ipa_ctx)
 		return ipa_ctx->smem_restricted_bytes;
@@ -4878,14 +5003,13 @@ u16 ipa_get_smem_restr_bytes(void)
 
 	return 0;
 }
-EXPORT_SYMBOL(ipa_get_smem_restr_bytes);
 
 /**
- * ipa_get_modem_cfg_emb_pipe_flt()- Return ipa_ctx->modem_cfg_emb_pipe_flt
+ * ipa2_get_modem_cfg_emb_pipe_flt()- Return ipa_ctx->modem_cfg_emb_pipe_flt
  *
  * Return value: true if modem configures embedded pipe flt, false otherwise
  */
-bool ipa_get_modem_cfg_emb_pipe_flt(void)
+bool ipa2_get_modem_cfg_emb_pipe_flt(void)
 {
 	if (ipa_ctx)
 		return ipa_ctx->modem_cfg_emb_pipe_flt;
@@ -4894,7 +5018,15 @@ bool ipa_get_modem_cfg_emb_pipe_flt(void)
 
 	return false;
 }
-EXPORT_SYMBOL(ipa_get_modem_cfg_emb_pipe_flt);
+/**
+ * ipa2_get_transport_type()- Return IPA_TRANSPORT_TYPE_SPS
+ *
+ * Return value: enum ipa_transport_type
+ */
+enum ipa_transport_type ipa2_get_transport_type(void)
+{
+	return IPA_TRANSPORT_TYPE_SPS;
+}
 
 u32 ipa_get_num_pipes(void)
 {
@@ -4906,11 +5038,11 @@ u32 ipa_get_num_pipes(void)
 EXPORT_SYMBOL(ipa_get_num_pipes);
 
 /**
- * ipa_disable_apps_wan_cons_deaggr()- set ipa_ctx->ipa_client_apps_wan_cons_agg_gro
+ * ipa2_disable_apps_wan_cons_deaggr()- set ipa_ctx->ipa_client_apps_wan_cons_agg_gro
  *
  * Return value: 0 or negative in case of failure
  */
-int ipa_disable_apps_wan_cons_deaggr(uint32_t agg_size, uint32_t agg_count)
+int ipa2_disable_apps_wan_cons_deaggr(uint32_t agg_size, uint32_t agg_count)
 {
 	int res = -1;
 
@@ -4936,21 +5068,252 @@ int ipa_disable_apps_wan_cons_deaggr(uint32_t agg_size, uint32_t agg_count)
 	}
 	return res;
 }
-EXPORT_SYMBOL(ipa_disable_apps_wan_cons_deaggr);
+
+static const struct ipa_gsi_ep_config *ipa2_get_gsi_ep_info
+	(enum ipa_client_type client)
+{
+	IPAERR("Not supported for IPA 2.x\n");
+	return NULL;
+}
+
+static int ipa2_stop_gsi_channel(u32 clnt_hdl)
+{
+	IPAERR("Not supported for IPA 2.x\n");
+	return -EFAULT;
+}
+
+static void *ipa2_get_ipc_logbuf(void)
+{
+	if (ipa_ctx)
+		return ipa_ctx->logbuf;
+
+	return NULL;
+}
+
+static void *ipa2_get_ipc_logbuf_low(void)
+{
+	if (ipa_ctx)
+		return ipa_ctx->logbuf_low;
+
+	return NULL;
+}
+
+static void ipa2_get_holb(int ep_idx, struct ipa_ep_cfg_holb *holb)
+{
+	*holb = ipa_ctx->ep[ep_idx].holb;
+}
+
+static int ipa2_generate_tag_process(void)
+{
+	int res;
+
+	res = ipa_tag_process(NULL, 0, HZ);
+	if (res)
+		IPAERR("TAG process failed\n");
+
+	return res;
+}
+
+static void ipa2_set_tag_process_before_gating(bool val)
+{
+	ipa_ctx->tag_process_before_gating = val;
+}
+
+int ipa2_bind_api_controller(enum ipa_hw_type ipa_hw_type,
+	struct ipa_api_controller *api_ctrl)
+{
+	if (ipa_hw_type < IPA_HW_v2_0 || ipa_hw_type >= IPA_HW_v3_0) {
+		IPAERR("Unsupported IPA HW version %d\n", ipa_hw_type);
+		WARN_ON(1);
+		return -EPERM;
+	}
+
+	api_ctrl->ipa_connect = ipa2_connect;
+	api_ctrl->ipa_disconnect = ipa2_disconnect;
+	api_ctrl->ipa_reset_endpoint = ipa2_reset_endpoint;
+	api_ctrl->ipa_clear_endpoint_delay = ipa2_clear_endpoint_delay;
+	api_ctrl->ipa_disable_endpoint = ipa2_disable_endpoint;
+	api_ctrl->ipa_cfg_ep = ipa2_cfg_ep;
+	api_ctrl->ipa_cfg_ep_nat = ipa2_cfg_ep_nat;
+	api_ctrl->ipa_cfg_ep_hdr = ipa2_cfg_ep_hdr;
+	api_ctrl->ipa_cfg_ep_hdr_ext = ipa2_cfg_ep_hdr_ext;
+	api_ctrl->ipa_cfg_ep_mode = ipa2_cfg_ep_mode;
+	api_ctrl->ipa_cfg_ep_aggr = ipa2_cfg_ep_aggr;
+	api_ctrl->ipa_cfg_ep_deaggr = ipa2_cfg_ep_deaggr;
+	api_ctrl->ipa_cfg_ep_route = ipa2_cfg_ep_route;
+	api_ctrl->ipa_cfg_ep_holb = ipa2_cfg_ep_holb;
+	api_ctrl->ipa_get_holb = ipa2_get_holb;
+	api_ctrl->ipa_set_tag_process_before_gating =
+			ipa2_set_tag_process_before_gating;
+	api_ctrl->ipa_cfg_ep_cfg = ipa2_cfg_ep_cfg;
+	api_ctrl->ipa_cfg_ep_metadata_mask = ipa2_cfg_ep_metadata_mask;
+	api_ctrl->ipa_cfg_ep_holb_by_client = ipa2_cfg_ep_holb_by_client;
+	api_ctrl->ipa_cfg_ep_ctrl = ipa2_cfg_ep_ctrl;
+	api_ctrl->ipa_add_hdr = ipa2_add_hdr;
+	api_ctrl->ipa_add_hdr_usr = ipa2_add_hdr_usr;
+	api_ctrl->ipa_del_hdr = ipa2_del_hdr;
+	api_ctrl->ipa_commit_hdr = ipa2_commit_hdr;
+	api_ctrl->ipa_reset_hdr = ipa2_reset_hdr;
+	api_ctrl->ipa_get_hdr = ipa2_get_hdr;
+	api_ctrl->ipa_put_hdr = ipa2_put_hdr;
+	api_ctrl->ipa_copy_hdr = ipa2_copy_hdr;
+	api_ctrl->ipa_add_hdr_proc_ctx = ipa2_add_hdr_proc_ctx;
+	api_ctrl->ipa_del_hdr_proc_ctx = ipa2_del_hdr_proc_ctx;
+	api_ctrl->ipa_add_rt_rule = ipa2_add_rt_rule;
+	api_ctrl->ipa_add_rt_rule_usr = ipa2_add_rt_rule_usr;
+	api_ctrl->ipa_del_rt_rule = ipa2_del_rt_rule;
+	api_ctrl->ipa_commit_rt = ipa2_commit_rt;
+	api_ctrl->ipa_reset_rt = ipa2_reset_rt;
+	api_ctrl->ipa_get_rt_tbl = ipa2_get_rt_tbl;
+	api_ctrl->ipa_put_rt_tbl = ipa2_put_rt_tbl;
+	api_ctrl->ipa_query_rt_index = ipa2_query_rt_index;
+	api_ctrl->ipa_mdfy_rt_rule = ipa2_mdfy_rt_rule;
+	api_ctrl->ipa_add_flt_rule = ipa2_add_flt_rule;
+	api_ctrl->ipa_add_flt_rule_usr = ipa2_add_flt_rule_usr;
+	api_ctrl->ipa_del_flt_rule = ipa2_del_flt_rule;
+	api_ctrl->ipa_mdfy_flt_rule = ipa2_mdfy_flt_rule;
+	api_ctrl->ipa_commit_flt = ipa2_commit_flt;
+	api_ctrl->ipa_reset_flt = ipa2_reset_flt;
+	api_ctrl->allocate_nat_device = ipa2_allocate_nat_device;
+	api_ctrl->ipa_nat_init_cmd = ipa2_nat_init_cmd;
+	api_ctrl->ipa_nat_dma_cmd = ipa2_nat_dma_cmd;
+	api_ctrl->ipa_nat_del_cmd = ipa2_nat_del_cmd;
+	api_ctrl->ipa_send_msg = ipa2_send_msg;
+	api_ctrl->ipa_register_pull_msg = ipa2_register_pull_msg;
+	api_ctrl->ipa_deregister_pull_msg = ipa2_deregister_pull_msg;
+	api_ctrl->ipa_register_intf = ipa2_register_intf;
+	api_ctrl->ipa_register_intf_ext = ipa2_register_intf_ext;
+	api_ctrl->ipa_deregister_intf = ipa2_deregister_intf;
+	api_ctrl->ipa_set_aggr_mode = ipa2_set_aggr_mode;
+	api_ctrl->ipa_set_qcncm_ndp_sig = ipa2_set_qcncm_ndp_sig;
+	api_ctrl->ipa_set_single_ndp_per_mbim = ipa2_set_single_ndp_per_mbim;
+	api_ctrl->ipa_tx_dp = ipa2_tx_dp;
+	api_ctrl->ipa_tx_dp_mul = ipa2_tx_dp_mul;
+	api_ctrl->ipa_free_skb = ipa2_free_skb;
+	api_ctrl->ipa_setup_sys_pipe = ipa2_setup_sys_pipe;
+	api_ctrl->ipa_teardown_sys_pipe = ipa2_teardown_sys_pipe;
+	api_ctrl->ipa_sys_update_gsi_hdls = ipa2_sys_update_gsi_hdls;
+	api_ctrl->ipa_sys_setup = ipa2_sys_setup;
+	api_ctrl->ipa_sys_teardown = ipa2_sys_teardown;
+	api_ctrl->ipa_connect_wdi_pipe = ipa2_connect_wdi_pipe;
+	api_ctrl->ipa_disconnect_wdi_pipe = ipa2_disconnect_wdi_pipe;
+	api_ctrl->ipa_enable_wdi_pipe = ipa2_enable_wdi_pipe;
+	api_ctrl->ipa_disable_wdi_pipe = ipa2_disable_wdi_pipe;
+	api_ctrl->ipa_resume_wdi_pipe = ipa2_resume_wdi_pipe;
+	api_ctrl->ipa_suspend_wdi_pipe = ipa2_suspend_wdi_pipe;
+	api_ctrl->ipa_get_wdi_stats = ipa2_get_wdi_stats;
+	api_ctrl->ipa_get_smem_restr_bytes = ipa2_get_smem_restr_bytes;
+	api_ctrl->ipa_uc_wdi_get_dbpa = ipa2_uc_wdi_get_dbpa;
+	api_ctrl->ipa_uc_reg_rdyCB = ipa2_uc_reg_rdyCB;
+	api_ctrl->ipa_uc_dereg_rdyCB = ipa2_uc_dereg_rdyCB;
+	api_ctrl->ipa_create_wdi_mapping = ipa2_create_wdi_mapping;
+	api_ctrl->ipa_release_wdi_mapping = ipa2_release_wdi_mapping;
+	api_ctrl->teth_bridge_init = ipa2_teth_bridge_init;
+	api_ctrl->teth_bridge_disconnect = ipa2_teth_bridge_disconnect;
+	api_ctrl->teth_bridge_connect = ipa2_teth_bridge_connect;
+	api_ctrl->ipa_set_client = ipa2_set_client;
+	api_ctrl->ipa_get_client = ipa2_get_client;
+	api_ctrl->ipa_get_client_uplink = ipa2_get_client_uplink;
+	api_ctrl->ipa_dma_init = ipa2_dma_init;
+	api_ctrl->ipa_dma_enable = ipa2_dma_enable;
+	api_ctrl->ipa_dma_disable = ipa2_dma_disable;
+	api_ctrl->ipa_dma_sync_memcpy = ipa2_dma_sync_memcpy;
+	api_ctrl->ipa_dma_async_memcpy = ipa2_dma_async_memcpy;
+	api_ctrl->ipa_dma_uc_memcpy = ipa2_dma_uc_memcpy;
+	api_ctrl->ipa_dma_destroy = ipa2_dma_destroy;
+	api_ctrl->ipa_mhi_init_engine = ipa2_mhi_init_engine;
+	api_ctrl->ipa_connect_mhi_pipe = ipa2_connect_mhi_pipe;
+	api_ctrl->ipa_disconnect_mhi_pipe = ipa2_disconnect_mhi_pipe;
+	api_ctrl->ipa_uc_mhi_reset_channel = ipa2_uc_mhi_reset_channel;
+	api_ctrl->ipa_mhi_sps_channel_empty = ipa2_mhi_sps_channel_empty;
+	api_ctrl->ipa_generate_tag_process = ipa2_generate_tag_process;
+	api_ctrl->ipa_disable_sps_pipe = ipa2_disable_sps_pipe;
+	api_ctrl->ipa_qmi_enable_force_clear_datapath_send =
+			qmi_enable_force_clear_datapath_send;
+	api_ctrl->ipa_qmi_disable_force_clear_datapath_send =
+			qmi_disable_force_clear_datapath_send;
+	api_ctrl->ipa_mhi_reset_channel_internal =
+			ipa2_mhi_reset_channel_internal;
+	api_ctrl->ipa_mhi_start_channel_internal =
+			ipa2_mhi_start_channel_internal;
+	api_ctrl->ipa_mhi_resume_channels_internal =
+			ipa2_mhi_resume_channels_internal;
+	api_ctrl->ipa_uc_mhi_send_dl_ul_sync_info =
+			ipa2_uc_mhi_send_dl_ul_sync_info;
+	api_ctrl->ipa_uc_mhi_init = ipa2_uc_mhi_init;
+	api_ctrl->ipa_uc_mhi_suspend_channel = ipa2_uc_mhi_suspend_channel;
+	api_ctrl->ipa_uc_mhi_stop_event_update_channel =
+			ipa2_uc_mhi_stop_event_update_channel;
+	api_ctrl->ipa_uc_mhi_cleanup = ipa2_uc_mhi_cleanup;
+	api_ctrl->ipa_uc_mhi_print_stats = ipa2_uc_mhi_print_stats;
+	api_ctrl->ipa_uc_state_check = ipa2_uc_state_check;
+	api_ctrl->ipa_write_qmap_id = ipa2_write_qmap_id;
+	api_ctrl->ipa_add_interrupt_handler = ipa2_add_interrupt_handler;
+	api_ctrl->ipa_remove_interrupt_handler = ipa2_remove_interrupt_handler;
+	api_ctrl->ipa_restore_suspend_handler = ipa2_restore_suspend_handler;
+	api_ctrl->ipa_bam_reg_dump = ipa2_bam_reg_dump;
+	api_ctrl->ipa_get_ep_mapping = ipa2_get_ep_mapping;
+	api_ctrl->ipa_is_ready = ipa2_is_ready;
+	api_ctrl->ipa_proxy_clk_vote = ipa2_proxy_clk_vote;
+	api_ctrl->ipa_proxy_clk_unvote = ipa2_proxy_clk_unvote;
+	api_ctrl->ipa_is_client_handle_valid = ipa2_is_client_handle_valid;
+	api_ctrl->ipa_get_client_mapping = ipa2_get_client_mapping;
+	api_ctrl->ipa_get_rm_resource_from_ep = ipa2_get_rm_resource_from_ep;
+	api_ctrl->ipa_get_modem_cfg_emb_pipe_flt =
+		ipa2_get_modem_cfg_emb_pipe_flt;
+	api_ctrl->ipa_get_transport_type = ipa2_get_transport_type;
+	api_ctrl->ipa_ap_suspend = ipa2_ap_suspend;
+	api_ctrl->ipa_ap_resume = ipa2_ap_resume;
+	api_ctrl->ipa_get_smmu_domain = ipa2_get_smmu_domain;
+	api_ctrl->ipa_disable_apps_wan_cons_deaggr =
+		ipa2_disable_apps_wan_cons_deaggr;
+	api_ctrl->ipa_get_dma_dev = ipa2_get_dma_dev;
+	api_ctrl->ipa_get_gsi_ep_info = ipa2_get_gsi_ep_info;
+	api_ctrl->ipa_stop_gsi_channel = ipa2_stop_gsi_channel;
+	api_ctrl->ipa_register_ipa_ready_cb = ipa2_register_ipa_ready_cb;
+	api_ctrl->ipa_inc_client_enable_clks = ipa2_inc_client_enable_clks;
+	api_ctrl->ipa_dec_client_disable_clks = ipa2_dec_client_disable_clks;
+	api_ctrl->ipa_inc_client_enable_clks_no_block =
+		ipa2_inc_client_enable_clks_no_block;
+	api_ctrl->ipa_suspend_resource_no_block =
+		ipa2_suspend_resource_no_block;
+	api_ctrl->ipa_resume_resource = ipa2_resume_resource;
+	api_ctrl->ipa_suspend_resource_sync = ipa2_suspend_resource_sync;
+	api_ctrl->ipa_set_required_perf_profile =
+		ipa2_set_required_perf_profile;
+	api_ctrl->ipa_get_ipc_logbuf = ipa2_get_ipc_logbuf;
+	api_ctrl->ipa_get_ipc_logbuf_low = ipa2_get_ipc_logbuf_low;
+	api_ctrl->ipa_setup_uc_ntn_pipes = ipa2_setup_uc_ntn_pipes;
+	api_ctrl->ipa_tear_down_uc_offload_pipes =
+		ipa2_tear_down_uc_offload_pipes;
+	api_ctrl->ipa_get_pdev = ipa2_get_pdev;
+	api_ctrl->ipa_ntn_uc_reg_rdyCB = ipa2_ntn_uc_reg_rdyCB;
+	api_ctrl->ipa_ntn_uc_dereg_rdyCB = ipa2_ntn_uc_dereg_rdyCB;
+	api_ctrl->ipa_conn_wdi3_pipes = ipa2_conn_wdi3_pipes;
+	api_ctrl->ipa_disconn_wdi3_pipes = ipa2_disconn_wdi3_pipes;
+	api_ctrl->ipa_enable_wdi3_pipes = ipa2_enable_wdi3_pipes;
+	api_ctrl->ipa_disable_wdi3_pipes = ipa2_disable_wdi3_pipes;
+
+	return 0;
+}
 
 /**
  * ipa_get_sys_yellow_wm()- Return yellow WM value for IPA SYS pipes.
  *
  * Return value: IPA_YELLOW_MARKER_SYS_CFG_OFST register if IPA_HW_v2.6L,
- *               0 otherwise.
+ *               IPA_DEFAULT_SYS_YELLOW_WM otherwise.
  */
-u32 ipa_get_sys_yellow_wm(void)
+u32 ipa_get_sys_yellow_wm(struct ipa_sys_context *sys)
 {
-	if (ipa_ctx->ipa_hw_type == IPA_HW_v2_6L)
+	if (ipa_ctx->ipa_hw_type == IPA_HW_v2_6L) {
 		return ipa_read_reg(ipa_ctx->mmio,
 			IPA_YELLOW_MARKER_SYS_CFG_OFST);
-	else
-		return 0;
+	} else {
+		if (!sys)
+			return 0;
+
+		return IPA_DEFAULT_SYS_YELLOW_WM * sys->rx_buff_sz;
+	}
 }
 EXPORT_SYMBOL(ipa_get_sys_yellow_wm);
 
@@ -4969,7 +5332,7 @@ void ipa_suspend_apps_pipes(bool suspend)
 	ipa_ep_idx = ipa_get_ep_mapping(IPA_CLIENT_APPS_LAN_CONS);
 	ep = &ipa_ctx->ep[ipa_ep_idx];
 	if (ep->valid) {
-		ipa_cfg_ep_ctrl(ipa_ep_idx, &cfg);
+		ipa2_cfg_ep_ctrl(ipa_ep_idx, &cfg);
 		/* Check if the pipes are empty. */
 		ret = sps_is_pipe_empty(ep->ep_hdl, &lan_empty);
 		if (ret) {
@@ -4993,7 +5356,7 @@ void ipa_suspend_apps_pipes(bool suspend)
 	}
 	ep = &ipa_ctx->ep[ipa_ep_idx];
 	if (ep->valid) {
-		ipa_cfg_ep_ctrl(ipa_ep_idx, &cfg);
+		ipa2_cfg_ep_ctrl(ipa_ep_idx, &cfg);
 		/* Check if the pipes are empty. */
 		ret = sps_is_pipe_empty(ep->ep_hdl, &wan_empty);
 		if (ret) {
@@ -5008,4 +5371,18 @@ void ipa_suspend_apps_pipes(bool suspend)
 				ep->sys->sps_callback(&notify);
 		}
 	}
+}
+
+/**
+ * ipa2_get_pdev() - return a pointer to IPA dev struct
+ *
+ * Return value: a pointer to IPA dev struct
+ *
+ */
+struct device *ipa2_get_pdev(void)
+{
+	if (!ipa_ctx)
+		return NULL;
+
+	return ipa_ctx->pdev;
 }
