@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2015, 2017 The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -23,15 +23,21 @@
 #include <linux/slab.h>
 #include <linux/ipa.h>
 #include <linux/msm-sps.h>
+#include <linux/platform_device.h>
 #include <asm/dma-iommu.h>
 #include <linux/iommu.h>
+#include <linux/ipa_uc_offload.h>
 #include "ipa_hw_defs.h"
 #include "ipa_ram_mmap.h"
 #include "ipa_reg.h"
 #include "ipa_qmi_service.h"
+#include "../ipa_api.h"
+#include "../ipa_common_i.h"
+#include "ipa_uc_offload_i.h"
 
 #define DRV_NAME "ipa"
 #define NAT_DEV_NAME "ipaNatTable"
+
 #define IPA_COOKIE 0x57831603
 #define IPA_RT_RULE_COOKIE 0x57831604
 #define IPA_RT_TBL_COOKIE 0x57831605
@@ -39,23 +45,69 @@
 #define IPA_HDR_COOKIE 0x57831607
 #define IPA_PROC_HDR_COOKIE 0x57831608
 
+
 #define MTU_BYTE 1500
 
 #define IPA_MAX_NUM_PIPES 0x14
-#define IPA_SYS_DESC_FIFO_SZ 0x800
+#define IPA_SYS_DESC_FIFO_SZ 0x2000
 #define IPA_SYS_TX_DATA_DESC_FIFO_SZ 0x1000
 #define IPA_LAN_RX_HEADER_LENGTH (2)
 #define IPA_QMAP_HEADER_LENGTH (4)
 #define IPA_DL_CHECKSUM_LENGTH (8)
 #define IPA_NUM_DESC_PER_SW_TX (2)
-#define IPA_GENERIC_RX_POOL_SZ 192
+#define IPA_GENERIC_RX_POOL_SZ 1000
+#define IPA_UC_FINISH_MAX 6
+#define IPA_UC_WAIT_MIN_SLEEP 1000
+#define IPA_UC_WAII_MAX_SLEEP 1200
+#define IPA_BAM_STOP_MAX_RETRY 10
+
+#define IPA_MAX_STATUS_STAT_NUM 30
+
+#define IPA_IPC_LOG_PAGES 50
+
+#define IPA_MAX_NUM_REQ_CACHE 10
 
 #define IPADBG(fmt, args...) \
-	pr_debug(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args)
+	do { \
+		pr_debug(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
+		if (ipa_ctx) { \
+			IPA_IPC_LOGGING(ipa_ctx->logbuf, \
+				DRV_NAME " %s:%d " fmt, ## args); \
+			IPA_IPC_LOGGING(ipa_ctx->logbuf_low, \
+				DRV_NAME " %s:%d " fmt, ## args); \
+			} \
+	} while (0)
+
+#define IPADBG_LOW(fmt, args...) \
+	do { \
+		pr_debug(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
+		if (ipa_ctx) \
+			IPA_IPC_LOGGING(ipa_ctx->logbuf_low, \
+				DRV_NAME " %s:%d " fmt, ## args); \
+	} while (0)
+
 #define IPAERR(fmt, args...) \
-	pr_err(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args)
+	do { \
+		pr_err(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
+		if (ipa_ctx) { \
+			IPA_IPC_LOGGING(ipa_ctx->logbuf, \
+				DRV_NAME " %s:%d " fmt, ## args); \
+			IPA_IPC_LOGGING(ipa_ctx->logbuf_low, \
+				DRV_NAME " %s:%d " fmt, ## args); \
+		} \
+	} while (0)
+
 #define IPAERR_RL(fmt, args...) \
-	pr_err_ratelimited(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args)
+	do { \
+		pr_err_ratelimited(DRV_NAME " %s:%d " fmt, __func__, \
+		__LINE__, ## args);\
+		if (ipa_ctx) { \
+			IPA_IPC_LOGGING(ipa_ctx->logbuf, \
+				DRV_NAME " %s:%d " fmt, ## args); \
+			IPA_IPC_LOGGING(ipa_ctx->logbuf_low, \
+				DRV_NAME " %s:%d " fmt, ## args); \
+		} \
+	} while (0)
 
 #define WLAN_AMPDU_TX_EP 15
 #define WLAN_PROD_TX_EP  19
@@ -129,8 +181,6 @@
 #define IPA_LAN_RX_HDR_NAME "ipa_lan_hdr"
 #define IPA_INVALID_L4_PROTOCOL 0xFF
 
-#define IPA_CLIENT_IS_PROD(x) (x >= IPA_CLIENT_PROD && x < IPA_CLIENT_CONS)
-#define IPA_CLIENT_IS_CONS(x) (x >= IPA_CLIENT_CONS && x < IPA_CLIENT_MAX)
 #define IPA_SETFIELD(val, shift, mask) (((val) << (shift)) & (mask))
 #define IPA_SETFIELD_IN_REG(reg, val, shift, mask) \
 			(reg |= ((val) << (shift)) & (mask))
@@ -147,12 +197,25 @@
 #define MAX_RESOURCE_TO_CLIENTS (IPA_CLIENT_MAX)
 #define IPA_MEM_PART(x_) (ipa_ctx->ctrl->mem_partition.x_)
 
-#define IPA_SMMU_AP_VA_START 0x1000
-#define IPA_SMMU_AP_VA_SIZE 0x40000000
-#define IPA_SMMU_AP_VA_END (IPA_SMMU_AP_VA_START +  IPA_SMMU_AP_VA_SIZE)
-#define IPA_SMMU_UC_VA_START 0x40000000
-#define IPA_SMMU_UC_VA_SIZE 0x20000000
-#define IPA_SMMU_UC_VA_END (IPA_SMMU_UC_VA_START +  IPA_SMMU_UC_VA_SIZE)
+#define IPA2_ACTIVE_CLIENTS_LOG_BUFFER_SIZE_LINES 120
+#define IPA2_ACTIVE_CLIENTS_LOG_LINE_LEN 96
+#define IPA2_ACTIVE_CLIENTS_LOG_HASHTABLE_SIZE 50
+#define IPA2_ACTIVE_CLIENTS_LOG_NAME_LEN 40
+
+struct ipa2_active_client_htable_entry {
+	struct hlist_node list;
+	char id_string[IPA2_ACTIVE_CLIENTS_LOG_NAME_LEN];
+	int count;
+	enum ipa_active_client_log_type type;
+};
+
+struct ipa2_active_clients_log_ctx {
+	char *log_buffer[IPA2_ACTIVE_CLIENTS_LOG_BUFFER_SIZE_LINES];
+	int log_head;
+	int log_tail;
+	bool log_rdy;
+	struct hlist_head htable[IPA2_ACTIVE_CLIENTS_LOG_HASHTABLE_SIZE];
+};
 
 
 struct ipa_client_names {
@@ -166,18 +229,9 @@ struct ipa_smmu_cb_ctx {
 	struct dma_iommu_mapping *mapping;
 	struct iommu_domain *iommu;
 	unsigned long next_addr;
-};
-
-/**
- * struct ipa_mem_buffer - IPA memory buffer
- * @base: base
- * @phys_base: physical base address
- * @size: size of memory buffer
- */
-struct ipa_mem_buffer {
-	void *base;
-	dma_addr_t phys_base;
-	u32 size;
+	u32 va_start;
+	u32 va_size;
+	u32 va_end;
 };
 
 /**
@@ -188,6 +242,8 @@ struct ipa_mem_buffer {
  * @tbl: filter table
  * @rt_tbl: routing table
  * @hw_len: entry's size
+ * @id: rule handle - globally unique
+ * @ipacm_installed: indicate if installed by ipacm
  */
 struct ipa_flt_entry {
 	struct list_head link;
@@ -197,6 +253,7 @@ struct ipa_flt_entry {
 	struct ipa_rt_tbl *rt_tbl;
 	u32 hw_len;
 	int id;
+	bool ipacm_installed;
 };
 
 /**
@@ -241,7 +298,7 @@ struct ipa_rt_tbl {
  * @is_partial: flag indicating if header table entry is partial
  * @is_hdr_proc_ctx: false - hdr entry resides in hdr table,
  * true - hdr entry resides in DDR and pointed to by proc ctx
- * @phys_base: physical address of entry in SRAM when is_hdr_proc_ctx is true,
+ * @phys_base: physical address of entry in DDR when is_hdr_proc_ctx is true,
  * else 0
  * @proc_ctx: processing context header
  * @offset_entry: entry's offset
@@ -251,6 +308,7 @@ struct ipa_rt_tbl {
  * @is_eth2_ofst_valid: is eth2_ofst field valid?
  * @eth2_ofst: offset to start of Ethernet-II/802.3 header
  * @user_deleted: is the header deleted by the user?
+ * @ipacm_installed: indicate if installed by ipacm
  */
 struct ipa_hdr_entry {
 	struct list_head link;
@@ -269,18 +327,7 @@ struct ipa_hdr_entry {
 	u8 is_eth2_ofst_valid;
 	u16 eth2_ofst;
 	bool user_deleted;
-};
-
-/**
- * struct ipa_hdr_offset_entry - IPA header offset entry
- * @link: entry's link in global header offset entries list
- * @offset: the offset
- * @bin: bin
- */
-struct ipa_hdr_offset_entry {
-	struct list_head link;
-	u32 offset;
-	u32 bin;
+	bool ipacm_installed;
 };
 
 /**
@@ -304,11 +351,13 @@ struct ipa_hdr_tbl {
  * @link: entry's link in global processing context header offset entries list
  * @offset: the offset
  * @bin: bin
+ * @ipacm_installed: indicate if installed by ipacm
  */
 struct ipa_hdr_proc_ctx_offset_entry {
 	struct list_head link;
 	u32 offset;
 	u32 bin;
+	bool ipacm_installed;
 };
 
 /**
@@ -345,6 +394,7 @@ struct ipa_hdr_proc_ctx_add_hdr_cmd_seq {
  * @ref_cnt: reference counter of routing table
  * @id: processing context header entry id
  * @user_deleted: is the hdr processing context deleted by the user?
+ * @ipacm_installed: indicate if installed by ipacm
  */
 struct ipa_hdr_proc_ctx_entry {
 	struct list_head link;
@@ -355,6 +405,7 @@ struct ipa_hdr_proc_ctx_entry {
 	u32 ref_cnt;
 	int id;
 	bool user_deleted;
+	bool ipacm_installed;
 };
 
 /**
@@ -404,6 +455,8 @@ struct ipa_flt_tbl {
  * @hdr: header table
  * @proc_ctx: processing context table
  * @hw_len: the length of the table
+ * @id: rule handle - globaly unique
+ * @ipacm_installed: indicate if installed by ipacm
  */
 struct ipa_rt_entry {
 	struct list_head link;
@@ -414,6 +467,7 @@ struct ipa_rt_entry {
 	struct ipa_hdr_proc_ctx_entry *proc_ctx;
 	u32 hw_len;
 	int id;
+	bool ipacm_installed;
 };
 
 /**
@@ -488,6 +542,21 @@ struct ipa_wlan_comm_memb {
 	atomic_t active_clnt_cnt;
 };
 
+struct ipa_status_stats {
+	struct ipa_hw_pkt_status status[IPA_MAX_STATUS_STAT_NUM];
+	int curr;
+};
+
+enum ipa_wakelock_ref_client {
+	IPA_WAKELOCK_REF_CLIENT_TX  = 0,
+	IPA_WAKELOCK_REF_CLIENT_LAN_RX = 1,
+	IPA_WAKELOCK_REF_CLIENT_WAN_RX = 2,
+	IPA_WAKELOCK_REF_CLIENT_WLAN_RX = 3,
+	IPA_WAKELOCK_REF_CLIENT_ODU_RX = 4,
+	IPA_WAKELOCK_REF_CLIENT_SPS = 5,
+	IPA_WAKELOCK_REF_CLIENT_MAX
+};
+
 /**
  * struct ipa_ep_context - IPA end point context
  * @valid: flag indicating id EP context is valid
@@ -543,10 +612,12 @@ struct ipa_ep_context {
 	bool skip_ep_cfg;
 	bool keep_ipa_awake;
 	struct ipa_wlan_stats wstats;
-	u32 wdi_state;
+	u32 uc_offload_state;
 	u32 rx_replenish_threshold;
 	bool disconnect_in_progress;
 	u32 qmi_request_sent;
+	enum ipa_wakelock_ref_client wakelock_client;
+	bool ep_disabled;
 
 	/* sys MUST be the last element of this struct */
 	struct ipa_sys_context *sys;
@@ -584,12 +655,14 @@ struct ipa_sys_context {
 	int (*pyld_hdlr)(struct sk_buff *skb, struct ipa_sys_context *sys);
 	struct sk_buff * (*get_skb)(unsigned int len, gfp_t flags);
 	void (*free_skb)(struct sk_buff *skb);
+	void (*free_rx_wrapper)(struct ipa_rx_pkt_wrapper *rk_pkt);
 	u32 rx_buff_sz;
 	u32 rx_pool_sz;
 	struct sk_buff *prev_skb;
 	unsigned int len_rem;
 	unsigned int len_pad;
 	unsigned int len_partial;
+	bool drop_packet;
 	struct work_struct work;
 	void (*sps_callback)(struct sps_event_notify *notify);
 	enum sps_option sps_option;
@@ -603,9 +676,11 @@ struct ipa_sys_context {
 	/* ordering is important - mutable fields go above */
 	struct ipa_ep_context *ep;
 	struct list_head head_desc_list;
+	struct list_head rcycl_list;
 	spinlock_t spinlock;
 	struct workqueue_struct *wq;
 	struct workqueue_struct *repl_wq;
+	struct ipa_status_stats *status_stat;
 	/* ordering is important - other immutable fields go below */
 };
 
@@ -617,6 +692,7 @@ struct ipa_sys_context {
 enum ipa_desc_type {
 	IPA_DATA_DESC,
 	IPA_DATA_DESC_SKB,
+	IPA_DATA_DESC_SKB_PAGED,
 	IPA_IMM_CMD_DESC
 };
 
@@ -659,6 +735,7 @@ struct ipa_tx_pkt_wrapper {
  * struct ipa_desc - IPA descriptor
  * @type: skb or immediate command or plain old data
  * @pyld: points to skb
+ * @frag: points to paged fragment
  * or kmalloc'ed immediate command parameters/plain old data
  * @dma_address: dma mapped address of pyld
  * @dma_address_valid: valid field for dma_address
@@ -672,6 +749,7 @@ struct ipa_tx_pkt_wrapper {
 struct ipa_desc {
 	enum ipa_desc_type type;
 	void *pyld;
+	skb_frag_t *frag;
 	dma_addr_t dma_address;
 	bool dma_address_valid;
 	u16 len;
@@ -781,6 +859,7 @@ struct ipa_stats {
 	u32 lan_repl_rx_empty;
 	u32 flow_enable;
 	u32 flow_disable;
+	u32 tx_non_linear;
 };
 
 struct ipa_active_clients {
@@ -790,17 +869,10 @@ struct ipa_active_clients {
 	int cnt;
 };
 
-enum ipa_wakelock_ref_client {
-	IPA_WAKELOCK_REF_CLIENT_TX  = 0,
-	IPA_WAKELOCK_REF_CLIENT_LAN_RX = 1,
-	IPA_WAKELOCK_REF_CLIENT_WAN_RX = 2,
-	IPA_WAKELOCK_REF_CLIENT_SPS = 3,
-	IPA_WAKELOCK_REF_CLIENT_MAX
-};
-
 struct ipa_wakelock_ref_cnt {
 	spinlock_t spinlock;
 	u32 cnt;
+	bool wakelock_acquired;
 };
 
 struct ipa_tag_completion {
@@ -809,134 +881,6 @@ struct ipa_tag_completion {
 };
 
 struct ipa_controller;
-
-/**
- *  @brief   Enum value determined based on the feature it
- *           corresponds to
- *  +----------------+----------------+
- *  |    3 bits      |     5 bits     |
- *  +----------------+----------------+
- *  |   HW_FEATURE   |     OPCODE     |
- *  +----------------+----------------+
- *
- */
-#define FEATURE_ENUM_VAL(feature, opcode) ((feature << 5) | opcode)
-#define EXTRACT_UC_FEATURE(value) (value >> 5)
-
-#define IPA_HW_NUM_FEATURES 0x8
-
-/**
- * enum ipa_hw_features - Values that represent the features supported in IPA HW
- * @IPA_HW_FEATURE_COMMON : Feature related to common operation of IPA HW
- * @IPA_HW_FEATURE_MHI : Feature related to MHI operation in IPA HW
- * @IPA_HW_FEATURE_WDI : Feature related to WDI operation in IPA HW
-*/
-enum ipa_hw_features {
-	IPA_HW_FEATURE_COMMON = 0x0,
-	IPA_HW_FEATURE_MHI    = 0x1,
-	IPA_HW_FEATURE_WDI    = 0x3,
-	IPA_HW_FEATURE_MAX    = IPA_HW_NUM_FEATURES
-};
-
-/**
- * struct IpaHwSharedMemCommonMapping_t - Structure referring to the common
- * section in 128B shared memory located in offset zero of SW Partition in IPA
- * SRAM.
- * @cmdOp : CPU->HW command opcode. See IPA_CPU_2_HW_COMMANDS
- * @cmdParams : CPU->HW command parameter. The parameter filed can hold 32 bits
- * of parameters (immediate parameters) and point on structure in system memory
- * (in such case the address must be accessible for HW)
- * @responseOp : HW->CPU response opcode. See IPA_HW_2_CPU_RESPONSES
- * @responseParams : HW->CPU response parameter. The parameter filed can hold 32
- * bits of parameters (immediate parameters) and point on structure in system
- * memory
- * @eventOp : HW->CPU event opcode. See IPA_HW_2_CPU_EVENTS
- * @eventParams : HW->CPU event parameter. The parameter filed can hold 32 bits of
- * parameters (immediate parameters) and point on structure in system memory
- * @firstErrorAddress : Contains the address of first error-source on SNOC
- * @hwState : State of HW. The state carries information regarding the error type.
- * @warningCounter : The warnings counter. The counter carries information regarding
- * non fatal errors in HW
- * @interfaceVersionCommon : The Common interface version as reported by HW
- *
- * The shared memory is used for communication between IPA HW and CPU.
- */
-struct IpaHwSharedMemCommonMapping_t {
-	u8  cmdOp;
-	u8  reserved_01;
-	u16 reserved_03_02;
-	u32 cmdParams;
-	u8  responseOp;
-	u8  reserved_09;
-	u16 reserved_0B_0A;
-	u32 responseParams;
-	u8  eventOp;
-	u8  reserved_11;
-	u16 reserved_13_12;
-	u32 eventParams;
-	u32 reserved_1B_18;
-	u32 firstErrorAddress;
-	u8  hwState;
-	u8  warningCounter;
-	u16 reserved_23_22;
-	u16 interfaceVersionCommon;
-	u16 reserved_27_26;
-} __packed;
-
-/**
- * union IpaHwFeatureInfoData_t - parameters for stats/config blob
- *
- * @offset : Location of a feature within the EventInfoData
- * @size : Size of the feature
- */
-union IpaHwFeatureInfoData_t {
-	struct IpaHwFeatureInfoParams_t {
-		u32 offset:16;
-		u32 size:16;
-	} __packed params;
-	u32 raw32b;
-} __packed;
-
-/**
- * struct IpaHwEventInfoData_t - Structure holding the parameters for
- * statistics and config info
- *
- * @baseAddrOffset : Base Address Offset of the statistics or config
- * structure from IPA_WRAPPER_BASE
- * @IpaHwFeatureInfoData_t : Location and size of each feature within
- * the statistics or config structure
- *
- * @note    Information about each feature in the featureInfo[]
- * array is populated at predefined indices per the IPA_HW_FEATURES
- * enum definition
- */
-struct IpaHwEventInfoData_t {
-	u32 baseAddrOffset;
-	union IpaHwFeatureInfoData_t featureInfo[IPA_HW_NUM_FEATURES];
-} __packed;
-
-/**
- * struct IpaHwEventLogInfoData_t - Structure holding the parameters for
- * IPA_HW_2_CPU_EVENT_LOG_INFO Event
- *
- * @featureMask : Mask indicating the features enabled in HW.
- * Refer IPA_HW_FEATURE_MASK
- * @circBuffBaseAddrOffset : Base Address Offset of the Circular Event
- * Log Buffer structure
- * @statsInfo : Statistics related information
- * @configInfo : Configuration related information
- *
- * @note    The offset location of this structure from IPA_WRAPPER_BASE
- * will be provided as Event Params for the IPA_HW_2_CPU_EVENT_LOG_INFO
- * Event
- */
-struct IpaHwEventLogInfoData_t {
-	u32 featureMask;
-	u32 circBuffBaseAddrOffset;
-	struct IpaHwEventInfoData_t statsInfo;
-	struct IpaHwEventInfoData_t configInfo;
-
-} __packed;
 
 /**
  * struct ipa_uc_hdlrs - IPA uC callback functions
@@ -985,58 +929,6 @@ enum ipa_hw_flags {
 };
 
 /**
- * enum ipa_hw_mhi_channel_states - MHI channel state machine
- *
- * Values are according to MHI specification
- * @IPA_HW_MHI_CHANNEL_STATE_DISABLE: Channel is disabled and not processed by
- *	the host or device.
- * @IPA_HW_MHI_CHANNEL_STATE_ENABLE: A channel is enabled after being
- *	initialized and configured by host, including its channel context and
- *	associated transfer ring. While this state, the channel is not active
- *	and the device does not process transfer.
- * @IPA_HW_MHI_CHANNEL_STATE_RUN: The device processes transfers and doorbell
- *	for channels.
- * @IPA_HW_MHI_CHANNEL_STATE_SUSPEND: Used to halt operations on the channel.
- *	The device does not process transfers for the channel in this state.
- *	This state is typically used to synchronize the transition to low power
- *	modes.
- * @IPA_HW_MHI_CHANNEL_STATE_STOP: Used to halt operations on the channel.
- *	The device does not process transfers for the channel in this state.
- * @IPA_HW_MHI_CHANNEL_STATE_ERROR: The device detected an error in an element
- *	from the transfer ring associated with the channel.
- * @IPA_HW_MHI_CHANNEL_STATE_INVALID: Invalid state. Shall not be in use in
- *	operational scenario.
- */
-enum ipa_hw_mhi_channel_states {
-	IPA_HW_MHI_CHANNEL_STATE_DISABLE	= 0,
-	IPA_HW_MHI_CHANNEL_STATE_ENABLE		= 1,
-	IPA_HW_MHI_CHANNEL_STATE_RUN		= 2,
-	IPA_HW_MHI_CHANNEL_STATE_SUSPEND	= 3,
-	IPA_HW_MHI_CHANNEL_STATE_STOP		= 4,
-	IPA_HW_MHI_CHANNEL_STATE_ERROR		= 5,
-	IPA_HW_MHI_CHANNEL_STATE_INVALID	= 0xFF
-};
-
-/**
- * Structure holding the parameters for IPA_CPU_2_HW_CMD_MHI_DL_UL_SYNC_INFO
- * command. Parameters are sent as 32b immediate parameters.
- * @isDlUlSyncEnabled: Flag to indicate if DL UL Syncronization is enabled
- * @UlAccmVal: UL Timer Accumulation value (Period after which device will poll
- *	for UL data)
- * @ulMsiEventThreshold: Threshold at which HW fires MSI to host for UL events
- * @dlMsiEventThreshold: Threshold at which HW fires MSI to host for DL events
- */
-union IpaHwMhiDlUlSyncCmdData_t {
-	struct IpaHwMhiDlUlSyncCmdParams_t {
-		u32 isDlUlSyncEnabled:8;
-		u32 UlAccmVal:8;
-		u32 ulMsiEventThreshold:8;
-		u32 dlMsiEventThreshold:8;
-	} params;
-	u32 raw32b;
-};
-
-/**
  * struct ipa_uc_ctx - IPA uC context
  * @uc_inited: Indicates if uC interface has been initialized
  * @uc_loaded: Indicates if uC has loaded
@@ -1062,6 +954,14 @@ struct ipa_uc_ctx {
 	u32 uc_status;
 	bool uc_zip_error;
 	u32 uc_error_type;
+	phys_addr_t rdy_ring_base_pa;
+	phys_addr_t rdy_ring_rp_pa;
+	u32 rdy_ring_size;
+	phys_addr_t rdy_comp_ring_base_pa;
+	phys_addr_t rdy_comp_ring_wp_pa;
+	u32 rdy_comp_ring_size;
+	u32 *rdy_ring_rp_va;
+	u32 *rdy_comp_ring_wp_va;
 };
 
 /**
@@ -1100,6 +1000,11 @@ struct ipa_sps_pm {
 struct ipacm_client_info {
 	enum ipacm_client_enum client_enum;
 	bool uplink;
+};
+
+struct ipa_cne_evt {
+	struct ipa_wan_msg wan_msg;
+	struct ipa_msg_meta msg_meta;
 };
 
 /**
@@ -1166,6 +1071,9 @@ struct ipacm_client_info {
  * @use_ipa_teth_bridge: use tethering bridge driver
  * @ipa_bam_remote_mode: ipa bam is in remote mode
  * @modem_cfg_emb_pipe_flt: modem configure embedded pipe filtering rules
+ * @logbuf: ipc log buffer for high priority messages
+ * @logbuf_low: ipc log buffer for low priority messages
+ * @ipa_wdi2: using wdi-2.0
  * @ipa_bus_hdl: msm driver handle for the data path bus
  * @ctrl: holds the core specific operations based on
  *  core version (vtable like)
@@ -1194,6 +1102,7 @@ struct ipa_context {
 	struct ipa_flt_tbl flt_tbl[IPA_MAX_NUM_PIPES][IPA_IP_MAX];
 	void __iomem *mmio;
 	u32 ipa_wrapper_base;
+	u32 ipa_wrapper_size;
 	struct ipa_flt_tbl glob_flt_tbl[IPA_IP_MAX];
 	struct ipa_hdr_tbl hdr_tbl;
 	struct ipa_hdr_proc_ctx_tbl hdr_proc_ctx_tbl;
@@ -1232,6 +1141,7 @@ struct ipa_context {
 	struct gen_pool *pipe_mem_pool;
 	struct dma_pool *dma_pool;
 	struct ipa_active_clients ipa_active_clients;
+	struct ipa2_active_clients_log_ctx ipa2_active_clients_logging;
 	struct workqueue_struct *power_mgmt_wq;
 	struct workqueue_struct *sps_power_mgmt_wq;
 	bool tag_process_before_gating;
@@ -1245,15 +1155,20 @@ struct ipa_context {
 	struct list_head msg_list;
 	struct list_head pull_msg_list;
 	struct mutex msg_lock;
+	struct list_head msg_wlan_client_list;
+	struct mutex msg_wlan_client_lock;
 	wait_queue_head_t msg_waitq;
 	enum ipa_hw_type ipa_hw_type;
 	enum ipa_hw_mode ipa_hw_mode;
 	bool use_ipa_teth_bridge;
 	bool ipa_bam_remote_mode;
 	bool modem_cfg_emb_pipe_flt;
+	bool ipa_wdi2;
 	/* featurize if memory footprint becomes a concern */
 	struct ipa_stats stats;
 	void *smem_pipe_mem;
+	void *logbuf;
+	void *logbuf_low;
 	u32 ipa_bus_hdl;
 	struct ipa_controller *ctrl;
 	struct idr ipa_idr;
@@ -1270,9 +1185,12 @@ struct ipa_context {
 	struct ipa_uc_ctx uc_ctx;
 
 	struct ipa_uc_wdi_ctx uc_wdi_ctx;
+	struct ipa_uc_ntn_ctx uc_ntn_ctx;
 	u32 wan_rx_ring_size;
+	u32 lan_rx_ring_size;
 	bool skip_uc_pipe_reset;
 	bool smmu_present;
+	bool smmu_s1_bypass;
 	unsigned long peer_bam_iova;
 	phys_addr_t peer_bam_pa;
 	u32 peer_bam_map_size;
@@ -1285,9 +1203,15 @@ struct ipa_context {
 
 	/* RMNET_IOCTL_INGRESS_FORMAT_AGG_DATA */
 	bool ipa_client_apps_wan_cons_agg_gro;
-	bool tethered_flow_control;
 	/* M-release support to know client pipes */
 	struct ipacm_client_info ipacm_client[IPA_MAX_NUM_PIPES];
+	bool tethered_flow_control;
+	u32 ipa_rx_min_timeout_usec;
+	u32 ipa_rx_max_timeout_usec;
+	u32 ipa_polling_iteration;
+	struct ipa_cne_evt ipa_cne_evt_req_cache[IPA_MAX_NUM_REQ_CACHE];
+	int num_ipa_cne_evt_req;
+	struct mutex ipa_cne_evt_lock;
 };
 
 /**
@@ -1335,10 +1259,14 @@ struct ipa_plat_drv_res {
 	u32 ee;
 	bool ipa_bam_remote_mode;
 	bool modem_cfg_emb_pipe_flt;
+	bool ipa_wdi2;
 	u32 wan_rx_ring_size;
+	u32 lan_rx_ring_size;
 	bool skip_uc_pipe_reset;
 	bool use_dma_zone;
 	bool tethered_flow_control;
+	u32 ipa_rx_polling_sleep_msec;
+	u32 ipa_polling_iteration;
 };
 
 struct ipa_mem_partition {
@@ -1451,20 +1379,349 @@ struct ipa_controller {
 
 extern struct ipa_context *ipa_ctx;
 
+/* public APIs */
+/*
+ * Connect / Disconnect
+ */
+int ipa2_connect(const struct ipa_connect_params *in,
+		struct ipa_sps_params *sps, u32 *clnt_hdl);
+int ipa2_disconnect(u32 clnt_hdl);
+
+/*
+ * Resume / Suspend
+ */
+int ipa2_reset_endpoint(u32 clnt_hdl);
+
+/*
+ * Remove ep delay
+ */
+int ipa2_clear_endpoint_delay(u32 clnt_hdl);
+
+/*
+ * Disable ep
+ */
+int ipa2_disable_endpoint(u32 clnt_hdl);
+
+/*
+ * Configuration
+ */
+int ipa2_cfg_ep(u32 clnt_hdl, const struct ipa_ep_cfg *ipa_ep_cfg);
+
+int ipa2_cfg_ep_nat(u32 clnt_hdl, const struct ipa_ep_cfg_nat *ipa_ep_cfg);
+
+int ipa2_cfg_ep_hdr(u32 clnt_hdl, const struct ipa_ep_cfg_hdr *ipa_ep_cfg);
+
+int ipa2_cfg_ep_hdr_ext(u32 clnt_hdl,
+			const struct ipa_ep_cfg_hdr_ext *ipa_ep_cfg);
+
+int ipa2_cfg_ep_mode(u32 clnt_hdl, const struct ipa_ep_cfg_mode *ipa_ep_cfg);
+
+int ipa2_cfg_ep_aggr(u32 clnt_hdl, const struct ipa_ep_cfg_aggr *ipa_ep_cfg);
+
+int ipa2_cfg_ep_deaggr(u32 clnt_hdl,
+		      const struct ipa_ep_cfg_deaggr *ipa_ep_cfg);
+
+int ipa2_cfg_ep_route(u32 clnt_hdl, const struct ipa_ep_cfg_route *ipa_ep_cfg);
+
+int ipa2_cfg_ep_holb(u32 clnt_hdl, const struct ipa_ep_cfg_holb *ipa_ep_cfg);
+
+int ipa2_cfg_ep_cfg(u32 clnt_hdl, const struct ipa_ep_cfg_cfg *ipa_ep_cfg);
+
+int ipa2_cfg_ep_metadata_mask(u32 clnt_hdl,
+	const struct ipa_ep_cfg_metadata_mask *ipa_ep_cfg);
+
+int ipa2_cfg_ep_holb_by_client(enum ipa_client_type client,
+				const struct ipa_ep_cfg_holb *ipa_ep_cfg);
+
+int ipa2_cfg_ep_ctrl(u32 clnt_hdl, const struct ipa_ep_cfg_ctrl *ep_ctrl);
+
+/*
+ * Header removal / addition
+ */
+int ipa2_add_hdr(struct ipa_ioc_add_hdr *hdrs);
+
+int ipa2_add_hdr_usr(struct ipa_ioc_add_hdr *hdrs, bool by_user);
+
+int ipa2_del_hdr(struct ipa_ioc_del_hdr *hdls);
+
+int ipa2_del_hdr_by_user(struct ipa_ioc_del_hdr *hdls, bool by_user);
+
+int ipa2_commit_hdr(void);
+
+int ipa2_reset_hdr(bool user_only);
+
+int ipa2_get_hdr(struct ipa_ioc_get_hdr *lookup);
+
+int ipa2_put_hdr(u32 hdr_hdl);
+
+int ipa2_copy_hdr(struct ipa_ioc_copy_hdr *copy);
+
+/*
+ * Header Processing Context
+ */
+int ipa2_add_hdr_proc_ctx(struct ipa_ioc_add_hdr_proc_ctx *proc_ctxs,
+							bool user_only);
+
+int ipa2_del_hdr_proc_ctx(struct ipa_ioc_del_hdr_proc_ctx *hdls);
+
+int ipa2_del_hdr_proc_ctx_by_user(struct ipa_ioc_del_hdr_proc_ctx *hdls,
+	bool by_user);
+
+/*
+ * Routing
+ */
+int ipa2_add_rt_rule(struct ipa_ioc_add_rt_rule *rules);
+
+int ipa2_add_rt_rule_usr(struct ipa_ioc_add_rt_rule *rules,
+	bool user_only);
+
+int ipa2_del_rt_rule(struct ipa_ioc_del_rt_rule *hdls);
+
+int ipa2_commit_rt(enum ipa_ip_type ip);
+
+int ipa2_reset_rt(enum ipa_ip_type ip, bool user_only);
+
+int ipa2_get_rt_tbl(struct ipa_ioc_get_rt_tbl *lookup);
+
+int ipa2_put_rt_tbl(u32 rt_tbl_hdl);
+
+int ipa2_query_rt_index(struct ipa_ioc_get_rt_tbl_indx *in);
+
+int ipa2_mdfy_rt_rule(struct ipa_ioc_mdfy_rt_rule *rules);
+
+/*
+ * Filtering
+ */
+int ipa2_add_flt_rule(struct ipa_ioc_add_flt_rule *rules);
+
+int ipa2_add_flt_rule_usr(struct ipa_ioc_add_flt_rule *rules,
+	bool user_only);
+
+int ipa2_del_flt_rule(struct ipa_ioc_del_flt_rule *hdls);
+
+int ipa2_mdfy_flt_rule(struct ipa_ioc_mdfy_flt_rule *rules);
+
+int ipa2_commit_flt(enum ipa_ip_type ip);
+
+int ipa2_reset_flt(enum ipa_ip_type ip, bool user_only);
+
+/*
+ * NAT
+ */
+int ipa2_allocate_nat_device(struct ipa_ioc_nat_alloc_mem *mem);
+
+int ipa2_nat_init_cmd(struct ipa_ioc_v4_nat_init *init);
+
+int ipa2_nat_dma_cmd(struct ipa_ioc_nat_dma_cmd *dma);
+
+int ipa2_nat_del_cmd(struct ipa_ioc_v4_nat_del *del);
+
+/*
+ * Messaging
+ */
+int ipa2_send_msg(struct ipa_msg_meta *meta, void *buff,
+		  ipa_msg_free_fn callback);
+int ipa2_resend_wlan_msg(void);
+int ipa2_register_pull_msg(struct ipa_msg_meta *meta, ipa_msg_pull_fn callback);
+int ipa2_deregister_pull_msg(struct ipa_msg_meta *meta);
+
+/*
+ * Interface
+ */
+int ipa2_register_intf(const char *name, const struct ipa_tx_intf *tx,
+		       const struct ipa_rx_intf *rx);
+int ipa2_register_intf_ext(const char *name, const struct ipa_tx_intf *tx,
+		       const struct ipa_rx_intf *rx,
+		       const struct ipa_ext_intf *ext);
+int ipa2_deregister_intf(const char *name);
+
+/*
+ * Aggregation
+ */
+int ipa2_set_aggr_mode(enum ipa_aggr_mode mode);
+
+int ipa2_set_qcncm_ndp_sig(char sig[3]);
+
+int ipa2_set_single_ndp_per_mbim(bool enable);
+
+/*
+ * Data path
+ */
+int ipa2_tx_dp(enum ipa_client_type dst, struct sk_buff *skb,
+		struct ipa_tx_meta *metadata);
+
+/*
+ * To transfer multiple data packets
+ * While passing the data descriptor list, the anchor node
+ * should be of type struct ipa_tx_data_desc not list_head
+*/
+int ipa2_tx_dp_mul(enum ipa_client_type dst,
+			struct ipa_tx_data_desc *data_desc);
+
+void ipa2_free_skb(struct ipa_rx_data *);
+
+/*
+ * System pipes
+ */
+int ipa2_setup_sys_pipe(struct ipa_sys_connect_params *sys_in, u32 *clnt_hdl);
+
+int ipa2_teardown_sys_pipe(u32 clnt_hdl);
+
+int ipa2_sys_setup(struct ipa_sys_connect_params *sys_in,
+	unsigned long *ipa_bam_hdl,
+	u32 *ipa_pipe_num, u32 *clnt_hdl, bool en_status);
+
+int ipa2_sys_teardown(u32 clnt_hdl);
+
+int ipa2_sys_update_gsi_hdls(u32 clnt_hdl, unsigned long gsi_ch_hdl,
+	unsigned long gsi_ev_hdl);
+
+int ipa2_connect_wdi_pipe(struct ipa_wdi_in_params *in,
+		struct ipa_wdi_out_params *out);
+int ipa2_disconnect_wdi_pipe(u32 clnt_hdl);
+int ipa2_enable_wdi_pipe(u32 clnt_hdl);
+int ipa2_disable_wdi_pipe(u32 clnt_hdl);
+int ipa2_resume_wdi_pipe(u32 clnt_hdl);
+int ipa2_suspend_wdi_pipe(u32 clnt_hdl);
+int ipa2_get_wdi_stats(struct IpaHwStatsWDIInfoData_t *stats);
+u16 ipa2_get_smem_restr_bytes(void);
+int ipa2_setup_uc_ntn_pipes(struct ipa_ntn_conn_in_params *inp,
+		ipa_notify_cb notify, void *priv, u8 hdr_len,
+		struct ipa_ntn_conn_out_params *outp);
+int ipa2_tear_down_uc_offload_pipes(int ipa_ep_idx_ul, int ipa_ep_idx_dl);
+int ipa2_ntn_uc_reg_rdyCB(void (*ipauc_ready_cb)(void *), void *priv);
+void ipa2_ntn_uc_dereg_rdyCB(void);
+
+int ipa2_conn_wdi3_pipes(struct ipa_wdi3_conn_in_params *in,
+	struct ipa_wdi3_conn_out_params *out);
+int ipa2_disconn_wdi3_pipes(int ipa_ep_idx_tx, int ipa_ep_idx_rx);
+int ipa2_enable_wdi3_pipes(int ipa_ep_idx_tx, int ipa_ep_idx_rx);
+int ipa2_disable_wdi3_pipes(int ipa_ep_idx_tx, int ipa_ep_idx_rx);
+
+/*
+ * To retrieve doorbell physical address of
+ * wlan pipes
+ */
+int ipa2_uc_wdi_get_dbpa(struct ipa_wdi_db_params *out);
+
+/*
+ * To register uC ready callback if uC not ready
+ * and also check uC readiness
+ * if uC not ready only, register callback
+ */
+int ipa2_uc_reg_rdyCB(struct ipa_wdi_uc_ready_params *param);
+/*
+ * To de-register uC ready callback
+ */
+int ipa2_uc_dereg_rdyCB(void);
+
+/*
+ * Tethering bridge (Rmnet / MBIM)
+ */
+int ipa2_teth_bridge_init(struct teth_bridge_init_params *params);
+
+int ipa2_teth_bridge_disconnect(enum ipa_client_type client);
+
+int ipa2_teth_bridge_connect(struct teth_bridge_connect_params *connect_params);
+
 /*
  * Tethering client info
  */
-void ipa_set_client(int index, enum ipacm_client_enum client, bool uplink);
+void ipa2_set_client(int index, enum ipacm_client_enum client, bool uplink);
 
-enum ipacm_client_enum ipa_get_client(int pipe_idx);
+enum ipacm_client_enum ipa2_get_client(int pipe_idx);
 
-bool ipa_get_client_uplink(int pipe_idx);
+bool ipa2_get_client_uplink(int pipe_idx);
+
+/*
+ * IPADMA
+ */
+int ipa2_dma_init(void);
+
+int ipa2_dma_enable(void);
+
+int ipa2_dma_disable(void);
+
+int ipa2_dma_sync_memcpy(u64 dest, u64 src, int len);
+
+int ipa2_dma_async_memcpy(u64 dest, u64 src, int len,
+			void (*user_cb)(void *user1), void *user_param);
+
+int ipa2_dma_uc_memcpy(phys_addr_t dest, phys_addr_t src, int len);
+
+void ipa2_dma_destroy(void);
+
+/*
+ * MHI APIs for IPA MHI client driver
+ */
+int ipa2_init_mhi(struct ipa_mhi_init_params *params);
+
+int ipa2_mhi_init_engine(struct ipa_mhi_init_engine *params);
+
+int ipa2_connect_mhi_pipe(struct ipa_mhi_connect_params_internal *in,
+		u32 *clnt_hdl);
+
+int ipa2_disconnect_mhi_pipe(u32 clnt_hdl);
+
+bool ipa2_mhi_sps_channel_empty(enum ipa_client_type client);
+
+int ipa2_disable_sps_pipe(enum ipa_client_type client);
+
+int ipa2_mhi_reset_channel_internal(enum ipa_client_type client);
+
+int ipa2_mhi_start_channel_internal(enum ipa_client_type client);
+
+int ipa2_mhi_suspend_ul_channels(void);
+
+int ipa2_mhi_resume_channels_internal(enum ipa_client_type client,
+		bool LPTransitionRejected, bool brstmode_enabled,
+		union __packed gsi_channel_scratch ch_scratch, u8 index);
+
+/*
+ * mux id
+ */
+int ipa2_write_qmap_id(struct ipa_ioc_write_qmapid *param_in);
+
+/*
+ * interrupts
+ */
+int ipa2_add_interrupt_handler(enum ipa_irq_type interrupt,
+		ipa_irq_handler_t handler,
+		bool deferred_flag,
+		void *private_data);
+
+int ipa2_remove_interrupt_handler(enum ipa_irq_type interrupt);
+
+/*
+ * Miscellaneous
+ */
+void ipa2_bam_reg_dump(void);
+
+int ipa2_get_ep_mapping(enum ipa_client_type client);
+
+bool ipa2_is_ready(void);
+
+void ipa2_proxy_clk_vote(void);
+void ipa2_proxy_clk_unvote(void);
+
+bool ipa2_is_client_handle_valid(u32 clnt_hdl);
+
+enum ipa_client_type ipa2_get_client_mapping(int pipe_idx);
+
+enum ipa_rm_resource_name ipa2_get_rm_resource_from_ep(int pipe_idx);
+
+bool ipa2_get_modem_cfg_emb_pipe_flt(void);
+
+/* internal functions */
+
+int ipa2_bind_api_controller(enum ipa_hw_type ipa_hw_type,
+	struct ipa_api_controller *api_ctrl);
 
 int ipa_send_one(struct ipa_sys_context *sys, struct ipa_desc *desc,
 		bool in_atomic);
 int ipa_send(struct ipa_sys_context *sys, u32 num_desc, struct ipa_desc *desc,
 		bool in_atomic);
-int ipa_get_ep_mapping(enum ipa_client_type client);
+int ipa2_get_ep_mapping(enum ipa_client_type client);
 
 int ipa_generate_hw_rule(enum ipa_ip_type ip,
 			 const struct ipa_rule_attrib *attrib,
@@ -1482,6 +1739,9 @@ void ipa_debugfs_init(void);
 void ipa_debugfs_remove(void);
 
 void ipa_dump_buff_internal(void *base, dma_addr_t phy_base, u32 size);
+
+void ipa_rx_timeout_min_max_calc(u32 *min, u32 *max, s8 time);
+
 #ifdef IPA_DEBUG
 #define IPA_DUMP_BUFF(base, phy_base, size) \
 	ipa_dump_buff_internal(base, phy_base, size)
@@ -1500,13 +1760,18 @@ int ipa_straddle_boundary(u32 start, u32 end, u32 boundary);
 struct ipa_context *ipa_get_ctx(void);
 void ipa_enable_clks(void);
 void ipa_disable_clks(void);
-void ipa_inc_client_enable_clks(void);
-int ipa_inc_client_enable_clks_no_block(void);
-void ipa_dec_client_disable_clks(void);
+void ipa2_inc_client_enable_clks(struct ipa_active_client_logging_info *id);
+int ipa2_inc_client_enable_clks_no_block(struct ipa_active_client_logging_info
+		*id);
+void ipa2_dec_client_disable_clks(struct ipa_active_client_logging_info *id);
+void ipa2_active_clients_log_dec(struct ipa_active_client_logging_info *id,
+		bool int_ctx);
+void ipa2_active_clients_log_inc(struct ipa_active_client_logging_info *id,
+		bool int_ctx);
+int ipa2_active_clients_log_print_buffer(char *buf, int size);
+int ipa2_active_clients_log_print_table(char *buf, int size);
+void ipa2_active_clients_log_clear(void);
 int ipa_interrupts_init(u32 ipa_irq, u32 ee, struct device *ipa_dev);
-int ipa_del_hdr_by_user(struct ipa_ioc_del_hdr *hdls, bool by_user);
-int ipa_del_hdr_proc_ctx_by_user(struct ipa_ioc_del_hdr_proc_ctx *hdls,
-	bool by_user);
 int __ipa_del_rt_rule(u32 rule_hdl);
 int __ipa_del_hdr(u32 hdr_hdl, bool by_user);
 int __ipa_release_hdr(u32 hdr_hdl);
@@ -1539,9 +1804,6 @@ static inline void ipa_write_reg(void *base, u32 offset, u32 val)
 {
 	iowrite32(val, base + offset);
 }
-
-int ipa_bridge_init(void);
-void ipa_bridge_cleanup(void);
 
 ssize_t ipa_read(struct file *filp, char __user *buf, size_t count,
 		 loff_t *f_pos);
@@ -1595,16 +1857,17 @@ int ipa_id_alloc(void *ptr);
 void *ipa_id_find(u32 id);
 void ipa_id_remove(u32 id);
 
-int ipa_set_required_perf_profile(enum ipa_voltage_level floor_voltage,
+int ipa2_set_required_perf_profile(enum ipa_voltage_level floor_voltage,
 				  u32 bandwidth_mbps);
 
-int ipa_cfg_ep_status(u32 clnt_hdl, const struct ipa_ep_cfg_status *ipa_ep_cfg);
+int ipa2_cfg_ep_status(u32 clnt_hdl,
+			const struct ipa_ep_cfg_status *ipa_ep_cfg);
 int ipa_cfg_aggr_cntr_granularity(u8 aggr_granularity);
 int ipa_cfg_eot_coal_cntr_granularity(u8 eot_coal_granularity);
 
-int ipa_suspend_resource_no_block(enum ipa_rm_resource_name name);
-int ipa_suspend_resource_sync(enum ipa_rm_resource_name name);
-int ipa_resume_resource(enum ipa_rm_resource_name name);
+int ipa2_suspend_resource_no_block(enum ipa_rm_resource_name name);
+int ipa2_suspend_resource_sync(enum ipa_rm_resource_name name);
+int ipa2_resume_resource(enum ipa_rm_resource_name name);
 bool ipa_should_pipe_be_suspended(enum ipa_client_type client);
 int ipa_tag_aggr_force_close(int pipe_num);
 
@@ -1625,12 +1888,10 @@ int ipa_q6_monitor_holb_mitigation(bool enable);
 int ipa_sps_connect_safe(struct sps_pipe *h, struct sps_connect *connect,
 			 enum ipa_client_type ipa_client);
 
-int ipa_mhi_handle_ipa_config_req(struct ipa_config_req_msg_v01 *config_req);
-
 int ipa_uc_interface_init(void);
 int ipa_uc_reset_pipe(enum ipa_client_type ipa_client);
 int ipa_uc_monitor_holb(enum ipa_client_type ipa_client, bool enable);
-int ipa_uc_state_check(void);
+int ipa2_uc_state_check(void);
 int ipa_uc_loaded_check(void);
 int ipa_uc_send_cmd(u32 cmd, u32 opcode, u32 expected_status,
 		    bool polling_mode, unsigned long timeout_jiffies);
@@ -1644,31 +1905,46 @@ void ipa_dma_async_memcpy_notify_cb(void *priv,
 
 int ipa_uc_update_hw_flags(u32 flags);
 
-int ipa_uc_mhi_init(void (*ready_cb)(void), void (*wakeup_request_cb)(void));
-int ipa_uc_mhi_send_dl_ul_sync_info(union IpaHwMhiDlUlSyncCmdData_t cmd);
+int ipa2_uc_mhi_init(void (*ready_cb)(void), void (*wakeup_request_cb)(void));
+void ipa2_uc_mhi_cleanup(void);
+int ipa2_uc_mhi_send_dl_ul_sync_info(union IpaHwMhiDlUlSyncCmdData_t *cmd);
 int ipa_uc_mhi_init_engine(struct ipa_mhi_msi_info *msi, u32 mmio_addr,
 	u32 host_ctrl_addr, u32 host_data_addr, u32 first_ch_idx,
 	u32 first_evt_idx);
 int ipa_uc_mhi_init_channel(int ipa_ep_idx, int channelHandle,
 	int contexArrayIndex, int channelDirection);
-int ipa_uc_mhi_reset_channel(int channelHandle);
-int ipa_uc_mhi_suspend_channel(int channelHandle);
+int ipa2_uc_mhi_reset_channel(int channelHandle);
+int ipa2_uc_mhi_suspend_channel(int channelHandle);
 int ipa_uc_mhi_resume_channel(int channelHandle, bool LPTransitionRejected);
-int ipa_uc_mhi_stop_event_update_channel(int channelHandle);
-int ipa_uc_mhi_print_stats(char *dbg_buff, int size);
+int ipa2_uc_mhi_stop_event_update_channel(int channelHandle);
+int ipa2_uc_mhi_print_stats(char *dbg_buff, int size);
 int ipa_uc_memcpy(phys_addr_t dest, phys_addr_t src, int len);
 u32 ipa_get_num_pipes(void);
-u32 ipa_get_sys_yellow_wm(void);
-int ipa_smmu_map_peer_bam(unsigned long dev);
-int ipa_smmu_unmap_peer_bam(unsigned long dev);
-struct ipa_smmu_cb_ctx *ipa_get_wlan_smmu_ctx(void);
-struct ipa_smmu_cb_ctx *ipa_get_uc_smmu_ctx(void);
+u32 ipa_get_sys_yellow_wm(struct ipa_sys_context *sys);
+struct ipa_smmu_cb_ctx *ipa2_get_smmu_ctx(void);
+struct ipa_smmu_cb_ctx *ipa2_get_wlan_smmu_ctx(void);
+struct ipa_smmu_cb_ctx *ipa2_get_uc_smmu_ctx(void);
 struct iommu_domain *ipa_get_uc_smmu_domain(void);
+struct iommu_domain *ipa2_get_wlan_smmu_domain(void);
+int ipa2_ap_suspend(struct device *dev);
+int ipa2_ap_resume(struct device *dev);
+struct iommu_domain *ipa2_get_smmu_domain(void);
+struct device *ipa2_get_dma_dev(void);
+int ipa2_release_wdi_mapping(u32 num_buffers, struct ipa_wdi_buffer_info *info);
+int ipa2_create_wdi_mapping(u32 num_buffers, struct ipa_wdi_buffer_info *info);
 void ipa_suspend_apps_pipes(bool suspend);
 void ipa_update_repl_threshold(enum ipa_client_type ipa_client);
 void ipa_flow_control(enum ipa_client_type ipa_client, bool enable,
 			uint32_t qmap_id);
+int ipa2_restore_suspend_handler(void);
 void ipa_sps_irq_control_all(bool enable);
 void ipa_inc_acquire_wakelock(enum ipa_wakelock_ref_client ref_client);
 void ipa_dec_release_wakelock(enum ipa_wakelock_ref_client ref_client);
+int ipa_iommu_map(struct iommu_domain *domain, unsigned long iova,
+	phys_addr_t paddr, size_t size, int prot);
+int ipa_ntn_init(void);
+int ipa2_get_ntn_stats(struct IpaHwStatsNTNInfoData_t *stats);
+int ipa2_register_ipa_ready_cb(void (*ipa_ready_cb)(void *),
+				void *user_data);
+struct device *ipa2_get_pdev(void);
 #endif /* _IPA_I_H_ */
