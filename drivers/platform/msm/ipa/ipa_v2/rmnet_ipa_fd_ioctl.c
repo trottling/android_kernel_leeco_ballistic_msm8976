@@ -148,8 +148,7 @@ static long wan_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		break;
 
 	case WAN_IOC_POLL_TETHERING_STATS:
-		IPAWANDBG("device %s got WAN_IOCTL_POLL_TETHERING_STATS :>>>\n",
-			  DRIVER_NAME);
+		IPAWANDBG_LOW("got WAN_IOCTL_POLL_TETHERING_STATS :>>>\n");
 		pyld_sz = sizeof(struct wan_ioctl_poll_tethering_stats);
 		param = kzalloc(pyld_sz, GFP_KERNEL);
 		if (!param) {
@@ -173,8 +172,7 @@ static long wan_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		break;
 
 	case WAN_IOC_SET_DATA_QUOTA:
-		IPAWANDBG("device %s got WAN_IOCTL_SET_DATA_QUOTA :>>>\n",
-			  DRIVER_NAME);
+		IPAWANDBG_LOW("got WAN_IOCTL_SET_DATA_QUOTA :>>>\n");
 		pyld_sz = sizeof(struct wan_ioctl_set_data_quota);
 		param = kzalloc(pyld_sz, GFP_KERNEL);
 		if (!param) {
@@ -186,7 +184,7 @@ static long wan_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			break;
 		}
 		rc = rmnet_ipa_set_data_quota(
-				(struct wan_ioctl_set_data_quota *)param);
+			(struct wan_ioctl_set_data_quota *)param);
 		if (rc != 0) {
 			IPAWANERR("WAN_IOC_SET_DATA_QUOTA failed\n");
 			if (rc == -ENODEV)
@@ -202,8 +200,7 @@ static long wan_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		break;
 
 	case WAN_IOC_SET_TETHER_CLIENT_PIPE:
-		IPAWANDBG("device %s got WAN_IOC_SET_TETHER_CLIENT_PIPE :>>>\n",
-				DRIVER_NAME);
+		IPAWANDBG_LOW("got WAN_IOC_SET_TETHER_CLIENT_PIPE :>>>\n");
 		pyld_sz = sizeof(struct wan_ioctl_set_tether_client_pipe);
 		param = kzalloc(pyld_sz, GFP_KERNEL);
 		if (!param) {
@@ -223,8 +220,7 @@ static long wan_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		break;
 
 	case WAN_IOC_QUERY_TETHER_STATS:
-		IPAWANDBG("device %s got WAN_IOC_QUERY_TETHER_STATS :>>>\n",
-				DRIVER_NAME);
+		IPAWANDBG_LOW("got WAN_IOC_QUERY_TETHER_STATS :>>>\n");
 		pyld_sz = sizeof(struct wan_ioctl_query_tether_stats);
 		param = kzalloc(pyld_sz, GFP_KERNEL);
 		if (!param) {
@@ -250,7 +246,7 @@ static long wan_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		break;
 
 	case WAN_IOC_QUERY_TETHER_STATS_ALL:
-		IPAWANDBG("got WAN_IOC_QUERY_TETHER_STATS_ALL :>>>\n");
+		IPAWANDBG_LOW("got WAN_IOC_QUERY_TETHER_STATS_ALL :>>>\n");
 		pyld_sz = sizeof(struct wan_ioctl_query_tether_stats_all);
 		param = kzalloc(pyld_sz, GFP_KERNEL);
 		if (!param) {
@@ -276,8 +272,7 @@ static long wan_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		break;
 
 	case WAN_IOC_RESET_TETHER_STATS:
-		IPAWANDBG("device %s got WAN_IOC_RESET_TETHER_STATS :>>>\n",
-				DRIVER_NAME);
+		IPAWANDBG_LOW("got WAN_IOC_RESET_TETHER_STATS :>>>\n");
 		pyld_sz = sizeof(struct wan_ioctl_reset_tether_stats);
 		param = kzalloc(pyld_sz, GFP_KERNEL);
 		if (!param) {

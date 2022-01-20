@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -553,7 +553,7 @@ static struct elem_info ipa3_filter_rule_type_data_v01_ei[] = {
 	},
 };
 
-static struct elem_info ipa3_filter_spec_type_data_v01_ei[] = {
+static struct elem_info ipa_filter_spec_type_data_v01_ei[] = {
 	{
 		.data_type	= QMI_UNSIGNED_4_BYTE,
 		.elem_len	= 1,
@@ -626,6 +626,96 @@ static struct elem_info ipa3_filter_spec_type_data_v01_ei[] = {
 		.tlv_type	= QMI_COMMON_TLV_TYPE,
 		.offset		= offsetof(struct ipa_filter_spec_type_v01,
 					mux_id),
+	},
+	{
+		.data_type	= QMI_EOTI,
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+	},
+};
+
+static struct elem_info ipa_filter_spec_ex_type_data_v01_ei[] = {
+	{
+		.data_type	= QMI_SIGNED_4_BYTE_ENUM,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint32_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+		.offset		= offsetof(struct ipa_filter_spec_ex_type_v01,
+					ip_type),
+	},
+	{
+		.data_type	= QMI_STRUCT,
+		.elem_len	= 1,
+		.elem_size	= sizeof(struct ipa_filter_rule_type_v01),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+		.offset		= offsetof(struct ipa_filter_spec_ex_type_v01,
+					filter_rule),
+		.ei_array	= ipa3_filter_rule_type_data_v01_ei,
+	},
+	{
+		.data_type	= QMI_SIGNED_4_BYTE_ENUM,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint32_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+		.offset		= offsetof(struct ipa_filter_spec_ex_type_v01,
+					filter_action),
+	},
+	{
+		.data_type	= QMI_UNSIGNED_1_BYTE,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+		.offset		= offsetof(struct ipa_filter_spec_ex_type_v01,
+					is_routing_table_index_valid),
+	},
+	{
+		.data_type	= QMI_UNSIGNED_4_BYTE,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint32_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+		.offset		= offsetof(struct ipa_filter_spec_ex_type_v01,
+					route_table_index),
+	},
+	{
+		.data_type	= QMI_UNSIGNED_1_BYTE,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+		.offset		= offsetof(struct ipa_filter_spec_ex_type_v01,
+					is_mux_id_valid),
+	},
+	{
+		.data_type	= QMI_UNSIGNED_4_BYTE,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint32_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+		.offset		= offsetof(struct ipa_filter_spec_ex_type_v01,
+					mux_id),
+	},
+	{
+		.data_type	= QMI_UNSIGNED_4_BYTE,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint32_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+		.offset		= offsetof(struct ipa_filter_spec_ex_type_v01,
+					rule_id),
+	},
+	{
+		.data_type	= QMI_UNSIGNED_1_BYTE,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+		.offset		= offsetof(struct ipa_filter_spec_ex_type_v01,
+					is_rule_hashable),
 	},
 	{
 		.data_type	= QMI_EOTI,
@@ -920,6 +1010,88 @@ struct elem_info ipa3_init_modem_driver_req_msg_data_v01_ei[] = {
 		.ei_array	= ipa3_zip_tbl_info_type_data_v01_ei,
 	},
 	{
+		.data_type	= QMI_OPT_FLAG,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x1B,
+		.offset		= offsetof(
+			struct ipa_init_modem_driver_req_msg_v01,
+			v4_hash_route_tbl_info_valid),
+	},
+	{
+		.data_type	= QMI_STRUCT,
+		.elem_len	= 1,
+		.elem_size	= sizeof(struct ipa_route_tbl_info_type_v01),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x1B,
+		.offset		= offsetof(
+			struct ipa_init_modem_driver_req_msg_v01,
+			v4_hash_route_tbl_info),
+		.ei_array	= ipa3_route_tbl_info_type_data_v01_ei,
+	},
+	{
+		.data_type	= QMI_OPT_FLAG,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x1C,
+		.offset		= offsetof(
+			struct ipa_init_modem_driver_req_msg_v01,
+			v6_hash_route_tbl_info_valid),
+	},
+	{
+		.data_type	= QMI_STRUCT,
+		.elem_len	= 1,
+		.elem_size	= sizeof(struct ipa_route_tbl_info_type_v01),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x1C,
+		.offset		= offsetof(
+			struct ipa_init_modem_driver_req_msg_v01,
+			v6_hash_route_tbl_info),
+		.ei_array	= ipa3_route_tbl_info_type_data_v01_ei,
+	},
+	{
+		.data_type	= QMI_OPT_FLAG,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x1D,
+		.offset		= offsetof(
+			struct ipa_init_modem_driver_req_msg_v01,
+			v4_hash_filter_tbl_start_addr_valid),
+	},
+	{
+		.data_type	= QMI_UNSIGNED_4_BYTE,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint32_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x1D,
+		.offset		= offsetof(
+			struct ipa_init_modem_driver_req_msg_v01,
+			v4_hash_filter_tbl_start_addr),
+	},
+	{
+		.data_type	= QMI_OPT_FLAG,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x1E,
+		.offset		= offsetof(
+			struct ipa_init_modem_driver_req_msg_v01,
+			v6_hash_filter_tbl_start_addr_valid),
+	},
+	{
+		.data_type	= QMI_UNSIGNED_4_BYTE,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint32_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x1E,
+		.offset		= offsetof(
+			struct ipa_init_modem_driver_req_msg_v01,
+			v6_hash_filter_tbl_start_addr),
+	},
+	{
 		.data_type	= QMI_EOTI,
 		.is_array	= NO_ARRAY,
 		.tlv_type	= QMI_COMMON_TLV_TYPE,
@@ -977,6 +1149,63 @@ struct elem_info ipa3_init_modem_driver_resp_msg_data_v01_ei[] = {
 		.offset		= offsetof(
 			struct ipa_init_modem_driver_resp_msg_v01,
 			default_end_pt),
+	},
+	{
+		.data_type	= QMI_OPT_FLAG,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x12,
+		.offset		= offsetof(
+			struct ipa_init_modem_driver_resp_msg_v01,
+			modem_driver_init_pending_valid),
+	},
+	{
+		.data_type	= QMI_UNSIGNED_1_BYTE,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x12,
+		.offset		= offsetof(
+			struct ipa_init_modem_driver_resp_msg_v01,
+			modem_driver_init_pending),
+	},
+	{
+		.data_type	= QMI_EOTI,
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+	},
+};
+
+struct elem_info ipa3_init_modem_driver_cmplt_req_msg_data_v01_ei[] = {
+	{
+		.data_type	= QMI_UNSIGNED_1_BYTE,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x01,
+		.offset		= offsetof(
+			struct ipa_init_modem_driver_cmplt_req_msg_v01,
+			status),
+	},
+	{
+		.data_type	= QMI_EOTI,
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+	},
+};
+
+struct elem_info ipa3_init_modem_driver_cmplt_resp_msg_data_v01_ei[] = {
+	{
+		.data_type	= QMI_STRUCT,
+		.elem_len	= 1,
+		.elem_size	= sizeof(struct qmi_response_type_v01),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x02,
+		.offset		= offsetof(
+			struct ipa_init_modem_driver_cmplt_resp_msg_v01,
+			resp),
+		.ei_array	= get_qmi_response_type_v01_ei(),
 	},
 	{
 		.data_type	= QMI_EOTI,
@@ -1101,7 +1330,7 @@ struct elem_info ipa3_install_fltr_rule_req_msg_data_v01_ei[] = {
 		.offset		= offsetof(
 			struct ipa_install_fltr_rule_req_msg_v01,
 			filter_spec_list),
-		.ei_array	= ipa3_filter_spec_type_data_v01_ei,
+		.ei_array	= ipa_filter_spec_type_data_v01_ei,
 	},
 	{
 		.data_type	= QMI_OPT_FLAG,
@@ -1194,6 +1423,37 @@ struct elem_info ipa3_install_fltr_rule_req_msg_data_v01_ei[] = {
 			xlat_filter_indices_list),
 	},
 	{
+		.data_type	= QMI_OPT_FLAG,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x15,
+		.offset		= offsetof(
+			struct ipa_install_fltr_rule_req_msg_v01,
+			filter_spec_ex_list_valid),
+	},
+	{
+		.data_type	= QMI_DATA_LEN,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x15,
+		.offset		= offsetof(
+			struct ipa_install_fltr_rule_req_msg_v01,
+			filter_spec_ex_list_len),
+	},
+	{
+		.data_type	= QMI_STRUCT,
+		.elem_len	= QMI_IPA_MAX_FILTERS_V01,
+		.elem_size	= sizeof(struct ipa_filter_spec_ex_type_v01),
+		.is_array	= VAR_LEN_ARRAY,
+		.tlv_type	= 0x15,
+		.offset		= offsetof(
+			struct ipa_install_fltr_rule_req_msg_v01,
+			filter_spec_ex_list),
+		.ei_array	= ipa_filter_spec_ex_type_data_v01_ei,
+	},
+	{
 		.data_type	= QMI_EOTI,
 		.is_array	= NO_ARRAY,
 		.tlv_type	= QMI_COMMON_TLV_TYPE,
@@ -1244,6 +1504,36 @@ struct elem_info ipa3_install_fltr_rule_resp_msg_data_v01_ei[] = {
 			filter_handle_list),
 		.ei_array	=
 			ipa3_filter_rule_identifier_to_handle_map_data_v01_ei,
+	},
+	{
+		.data_type	= QMI_OPT_FLAG,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x11,
+		.offset		= offsetof(
+			struct ipa_install_fltr_rule_resp_msg_v01,
+			rule_id_valid),
+	},
+	{
+		.data_type	= QMI_DATA_LEN,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x11,
+		.offset		= offsetof(
+			struct ipa_install_fltr_rule_resp_msg_v01,
+			rule_id_len),
+	},
+	{
+		.data_type	= QMI_UNSIGNED_4_BYTE,
+		.elem_len	= QMI_IPA_MAX_FILTERS_V01,
+		.elem_size	= sizeof(uint32_t),
+		.is_array	= VAR_LEN_ARRAY,
+		.tlv_type	= 0x11,
+		.offset		= offsetof(
+			struct ipa_install_fltr_rule_resp_msg_v01,
+			rule_id),
 	},
 	{
 		.data_type	= QMI_EOTI,
@@ -1434,6 +1724,66 @@ struct elem_info ipa3_fltr_installed_notif_req_msg_data_v01_ei[] = {
 		.offset		= offsetof(
 			struct ipa_fltr_installed_notif_req_msg_v01,
 			start_ipv6_filter_idx),
+	},
+	{
+		.data_type	= QMI_OPT_FLAG,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x17,
+		.offset		= offsetof(
+			struct ipa_fltr_installed_notif_req_msg_v01,
+			rule_id_valid),
+	},
+	{
+		.data_type	= QMI_DATA_LEN,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x17,
+		.offset		= offsetof(
+			struct ipa_fltr_installed_notif_req_msg_v01,
+			rule_id_len),
+	},
+	{
+		.data_type	= QMI_UNSIGNED_4_BYTE,
+		.elem_len	= QMI_IPA_MAX_FILTERS_V01,
+		.elem_size	= sizeof(uint32_t),
+		.is_array	= VAR_LEN_ARRAY,
+		.tlv_type	= 0x17,
+		.offset		= offsetof(
+			struct ipa_fltr_installed_notif_req_msg_v01,
+			rule_id),
+	},
+	{
+		.data_type	= QMI_OPT_FLAG,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x18,
+		.offset		= offsetof(
+			struct ipa_fltr_installed_notif_req_msg_v01,
+			dst_pipe_id_valid),
+	},
+	{
+		.data_type	= QMI_DATA_LEN,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x18,
+		.offset		= offsetof(
+			struct ipa_fltr_installed_notif_req_msg_v01,
+			dst_pipe_id_len),
+	},
+	{
+		.data_type	= QMI_UNSIGNED_4_BYTE,
+		.elem_len	= QMI_IPA_MAX_CLIENT_DST_PIPES_V01,
+		.elem_size	= sizeof(uint32_t),
+		.is_array	= VAR_LEN_ARRAY,
+		.tlv_type	= 0x18,
+		.offset		= offsetof(
+			struct ipa_fltr_installed_notif_req_msg_v01,
+			dst_pipe_id),
 	},
 	{
 		.data_type	= QMI_EOTI,
@@ -1805,6 +2155,66 @@ struct elem_info ipa3_config_req_msg_data_v01_ei[] = {
 		.offset		= offsetof(
 			struct ipa_config_req_msg_v01,
 			dl_msi_event_threshold),
+	},
+	{
+		.data_type	= QMI_OPT_FLAG,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x1C,
+		.offset		= offsetof(
+			struct ipa_config_req_msg_v01,
+			ul_fifo_size_valid),
+	},
+	{
+		.data_type	= QMI_UNSIGNED_4_BYTE,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint32_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x1C,
+		.offset		= offsetof(
+			struct ipa_config_req_msg_v01,
+			ul_fifo_size),
+	},
+	{
+		.data_type	= QMI_OPT_FLAG,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x1D,
+		.offset		= offsetof(
+			struct ipa_config_req_msg_v01,
+			dl_fifo_size_valid),
+	},
+	{
+		.data_type	= QMI_UNSIGNED_4_BYTE,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint32_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x1D,
+		.offset		= offsetof(
+			struct ipa_config_req_msg_v01,
+			dl_fifo_size),
+	},
+	{
+		.data_type	= QMI_OPT_FLAG,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x1E,
+		.offset		= offsetof(
+			struct ipa_config_req_msg_v01,
+			dl_buf_size_valid),
+	},
+	{
+		.data_type	= QMI_UNSIGNED_4_BYTE,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint32_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x1E,
+		.offset		= offsetof(
+			struct ipa_config_req_msg_v01,
+			dl_buf_size),
 	},
 	{
 		.data_type	= QMI_EOTI,
@@ -2357,6 +2767,614 @@ struct elem_info ipa3_stop_data_usage_quota_resp_msg_data_v01_ei[] = {
 			struct ipa_stop_data_usage_quota_resp_msg_v01,
 			resp),
 		.ei_array	= get_qmi_response_type_v01_ei(),
+	},
+	{
+		.data_type	= QMI_EOTI,
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+	},
+};
+
+struct elem_info ipa3_install_fltr_rule_req_ex_msg_data_v01_ei[] = {
+	{
+		.data_type	= QMI_OPT_FLAG,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x10,
+		.offset		= offsetof(
+			struct ipa_install_fltr_rule_req_ex_msg_v01,
+			filter_spec_ex_list_valid),
+	},
+	{
+		.data_type	= QMI_DATA_LEN,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x10,
+		.offset		= offsetof(
+			struct ipa_install_fltr_rule_req_ex_msg_v01,
+			filter_spec_ex_list_len),
+	},
+	{
+		.data_type	= QMI_STRUCT,
+		.elem_len	= QMI_IPA_MAX_FILTERS_EX_V01,
+		.elem_size	= sizeof(struct
+					ipa_filter_spec_ex_type_v01),
+		.is_array	= VAR_LEN_ARRAY,
+		.tlv_type	= 0x10,
+		.offset		= offsetof(
+			struct ipa_install_fltr_rule_req_ex_msg_v01,
+			filter_spec_ex_list),
+		.ei_array	= ipa_filter_spec_ex_type_data_v01_ei,
+	},
+	{
+		.data_type	= QMI_OPT_FLAG,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x11,
+		.offset		= offsetof(
+			struct ipa_install_fltr_rule_req_ex_msg_v01,
+			source_pipe_index_valid),
+	},
+	{
+		.data_type	= QMI_UNSIGNED_4_BYTE,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint32_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x11,
+		.offset		= offsetof(
+			struct ipa_install_fltr_rule_req_ex_msg_v01,
+			source_pipe_index),
+	},
+	{
+		.data_type	= QMI_OPT_FLAG,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x12,
+		.offset		= offsetof(
+			struct ipa_install_fltr_rule_req_ex_msg_v01,
+			num_ipv4_filters_valid),
+	},
+	{
+		.data_type	= QMI_UNSIGNED_4_BYTE,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint32_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x12,
+		.offset		= offsetof(
+			struct ipa_install_fltr_rule_req_ex_msg_v01,
+			num_ipv4_filters),
+	},
+	{
+		.data_type	= QMI_OPT_FLAG,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x13,
+		.offset		= offsetof(
+			struct ipa_install_fltr_rule_req_ex_msg_v01,
+			num_ipv6_filters_valid),
+	},
+	{
+		.data_type	= QMI_UNSIGNED_4_BYTE,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint32_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x13,
+		.offset		= offsetof(
+			struct ipa_install_fltr_rule_req_ex_msg_v01,
+			num_ipv6_filters),
+	},
+	{
+		.data_type	= QMI_OPT_FLAG,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x14,
+		.offset		= offsetof(
+			struct ipa_install_fltr_rule_req_ex_msg_v01,
+			xlat_filter_indices_list_valid),
+	},
+	{
+		.data_type	= QMI_DATA_LEN,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x14,
+		.offset		= offsetof(
+			struct ipa_install_fltr_rule_req_ex_msg_v01,
+			xlat_filter_indices_list_len),
+	},
+	{
+		.data_type	= QMI_UNSIGNED_4_BYTE,
+		.elem_len	= QMI_IPA_MAX_FILTERS_EX_V01,
+		.elem_size	= sizeof(uint32_t),
+		.is_array	= VAR_LEN_ARRAY,
+		.tlv_type	= 0x14,
+		.offset		= offsetof(
+			struct ipa_install_fltr_rule_req_ex_msg_v01,
+			xlat_filter_indices_list),
+	},
+	{
+		.data_type	= QMI_EOTI,
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+	},
+};
+
+struct elem_info ipa3_install_fltr_rule_resp_ex_msg_data_v01_ei[] = {
+	{
+		.data_type	= QMI_STRUCT,
+		.elem_len	= 1,
+		.elem_size	= sizeof(struct qmi_response_type_v01),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x02,
+		.offset		= offsetof(
+			struct ipa_install_fltr_rule_resp_ex_msg_v01,
+			resp),
+		.ei_array	= get_qmi_response_type_v01_ei(),
+	},
+	{
+		.data_type	= QMI_OPT_FLAG,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x10,
+		.offset		= offsetof(
+			struct ipa_install_fltr_rule_resp_ex_msg_v01,
+			rule_id_valid),
+	},
+	{
+		.data_type	= QMI_DATA_LEN,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x10,
+		.offset		= offsetof(
+			struct ipa_install_fltr_rule_resp_ex_msg_v01,
+			rule_id_len),
+	},
+	{
+		.data_type	= QMI_UNSIGNED_4_BYTE,
+		.elem_len	= QMI_IPA_MAX_FILTERS_EX_V01,
+		.elem_size	= sizeof(uint32_t),
+		.is_array	= VAR_LEN_ARRAY,
+		.tlv_type	= 0x10,
+		.offset		= offsetof(
+			struct ipa_install_fltr_rule_resp_ex_msg_v01,
+			rule_id),
+	},
+	{
+		.data_type	= QMI_EOTI,
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+	},
+};
+
+struct elem_info ipa3_per_client_stats_info_type_data_v01_ei[] = {
+	{
+			.data_type	= QMI_UNSIGNED_4_BYTE,
+			.elem_len	= 1,
+			.elem_size	= sizeof(uint32_t),
+			.is_array	= NO_ARRAY,
+			.tlv_type	= QMI_COMMON_TLV_TYPE,
+			.offset		= offsetof(
+				struct ipa_per_client_stats_info_type_v01,
+				client_id),
+	},
+	{
+			.data_type	= QMI_UNSIGNED_4_BYTE,
+			.elem_len	= 1,
+			.elem_size	= sizeof(uint32_t),
+			.is_array	= NO_ARRAY,
+			.tlv_type	= QMI_COMMON_TLV_TYPE,
+			.offset		= offsetof(
+				struct ipa_per_client_stats_info_type_v01,
+				src_pipe_id),
+	},
+	{
+			.data_type	= QMI_UNSIGNED_8_BYTE,
+			.elem_len	= 1,
+			.elem_size	= sizeof(uint64_t),
+			.is_array	= NO_ARRAY,
+			.tlv_type	= QMI_COMMON_TLV_TYPE,
+			.offset		= offsetof(
+				struct ipa_per_client_stats_info_type_v01,
+				num_ul_ipv4_bytes),
+
+	},
+	{
+			.data_type	= QMI_UNSIGNED_8_BYTE,
+			.elem_len	= 1,
+			.elem_size	= sizeof(uint64_t),
+			.is_array	= NO_ARRAY,
+			.tlv_type	= QMI_COMMON_TLV_TYPE,
+			.offset		= offsetof(
+				struct ipa_per_client_stats_info_type_v01,
+				num_ul_ipv6_bytes),
+
+	},
+	{
+			.data_type	= QMI_UNSIGNED_8_BYTE,
+			.elem_len	= 1,
+			.elem_size	= sizeof(uint64_t),
+			.is_array	= NO_ARRAY,
+			.tlv_type	= QMI_COMMON_TLV_TYPE,
+			.offset		= offsetof(
+				struct ipa_per_client_stats_info_type_v01,
+				num_dl_ipv4_bytes),
+
+	},
+	{
+			.data_type	= QMI_UNSIGNED_8_BYTE,
+			.elem_len	= 1,
+			.elem_size	= sizeof(uint64_t),
+			.is_array	= NO_ARRAY,
+			.tlv_type	= QMI_COMMON_TLV_TYPE,
+			.offset		= offsetof(
+				struct ipa_per_client_stats_info_type_v01,
+				num_dl_ipv6_bytes),
+
+	},
+	{
+			.data_type	= QMI_UNSIGNED_4_BYTE,
+			.elem_len	= 1,
+			.elem_size	= sizeof(uint32_t),
+			.is_array	= NO_ARRAY,
+			.tlv_type	= QMI_COMMON_TLV_TYPE,
+			.offset		= offsetof(
+				struct ipa_per_client_stats_info_type_v01,
+				num_ul_ipv4_pkts),
+
+	},
+	{
+			.data_type	= QMI_UNSIGNED_4_BYTE,
+			.elem_len	= 1,
+			.elem_size	= sizeof(uint32_t),
+			.is_array	= NO_ARRAY,
+			.tlv_type	= QMI_COMMON_TLV_TYPE,
+			.offset		= offsetof(
+				struct ipa_per_client_stats_info_type_v01,
+				num_ul_ipv6_pkts),
+
+	},
+	{
+			.data_type	= QMI_UNSIGNED_4_BYTE,
+			.elem_len	= 1,
+			.elem_size	= sizeof(uint32_t),
+			.is_array	= NO_ARRAY,
+			.tlv_type	= QMI_COMMON_TLV_TYPE,
+			.offset		= offsetof(
+				struct ipa_per_client_stats_info_type_v01,
+				num_dl_ipv4_pkts),
+
+	},
+	{
+			.data_type	= QMI_UNSIGNED_4_BYTE,
+			.elem_len	= 1,
+			.elem_size	= sizeof(uint32_t),
+			.is_array	= NO_ARRAY,
+			.tlv_type	= QMI_COMMON_TLV_TYPE,
+			.offset		= offsetof(
+				struct ipa_per_client_stats_info_type_v01,
+				num_dl_ipv6_pkts),
+
+	},
+	{
+		.data_type	= QMI_EOTI,
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+	},
+};
+
+struct elem_info ipa3_ul_firewall_rule_type_data_v01_ei[] = {
+	{
+			.data_type	= QMI_UNSIGNED_4_BYTE,
+			.elem_len	= 1,
+			.elem_size	= sizeof(uint32_t),
+			.is_array	= NO_ARRAY,
+			.tlv_type	= QMI_COMMON_TLV_TYPE,
+			.offset		= offsetof(
+				struct ipa_ul_firewall_rule_type_v01,
+				ip_type),
+	},
+	{
+		.data_type	= QMI_STRUCT,
+		.elem_len	= 1,
+		.elem_size	= sizeof(struct ipa_filter_rule_type_v01),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+		.offset		= offsetof(struct ipa_ul_firewall_rule_type_v01,
+					filter_rule),
+		.ei_array	= ipa3_filter_rule_type_data_v01_ei,
+	},
+	{
+		.data_type	= QMI_EOTI,
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+	},
+};
+
+struct elem_info ipa3_ul_firewall_config_result_type_data_v01_ei[] = {
+	{
+			.data_type	= QMI_UNSIGNED_4_BYTE,
+			.elem_len	= 1,
+			.elem_size	= sizeof(uint32_t),
+			.is_array	= NO_ARRAY,
+			.tlv_type	= QMI_COMMON_TLV_TYPE,
+			.offset		= offsetof(
+				struct ipa_ul_firewall_config_result_type_v01,
+				is_success),
+	},
+	{
+		.data_type	= QMI_UNSIGNED_4_BYTE,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint32_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+		.offset		= offsetof(
+			struct ipa_ul_firewall_config_result_type_v01,
+			mux_id),
+	},
+	{
+		.data_type	= QMI_EOTI,
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+	},
+};
+
+struct elem_info ipa3_enable_per_client_stats_req_msg_data_v01_ei[] = {
+	{
+				.data_type	= QMI_UNSIGNED_1_BYTE,
+				.elem_len	= 1,
+				.elem_size	= sizeof(uint8_t),
+				.is_array	= NO_ARRAY,
+				.tlv_type	= 0x01,
+				.offset		= offsetof(struct
+				ipa_enable_per_client_stats_req_msg_v01,
+				enable_per_client_stats),
+	},
+	{
+		.data_type	= QMI_EOTI,
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+	},
+};
+
+struct elem_info ipa3_enable_per_client_stats_resp_msg_data_v01_ei[] = {
+	{
+		.data_type	= QMI_STRUCT,
+		.elem_len	= 1,
+		.elem_size	= sizeof(struct qmi_response_type_v01),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x02,
+		.offset		= offsetof(
+			struct ipa_enable_per_client_stats_resp_msg_v01,
+			resp),
+		.ei_array	= get_qmi_response_type_v01_ei(),
+	},
+	{
+		.data_type	= QMI_EOTI,
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+	},
+};
+
+struct elem_info ipa3_get_stats_per_client_req_msg_data_v01_ei[] = {
+	{
+		.data_type	= QMI_UNSIGNED_4_BYTE,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint32_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x01,
+		.offset		= offsetof(
+			struct ipa_get_stats_per_client_req_msg_v01,
+			client_id),
+	},
+	{
+		.data_type	= QMI_UNSIGNED_4_BYTE,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint32_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x02,
+		.offset		= offsetof(
+			struct ipa_get_stats_per_client_req_msg_v01,
+			src_pipe_id),
+	},
+	{
+		.data_type	= QMI_OPT_FLAG,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x10,
+		.offset		= offsetof(
+			struct ipa_get_stats_per_client_req_msg_v01,
+			reset_stats_valid),
+	},
+	{
+		.data_type	= QMI_UNSIGNED_1_BYTE,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x10,
+		.offset		= offsetof(
+			struct ipa_get_stats_per_client_req_msg_v01,
+			reset_stats),
+	},
+	{
+		.data_type	= QMI_EOTI,
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+	},
+};
+
+struct elem_info ipa3_get_stats_per_client_resp_msg_data_v01_ei[] = {
+	{
+		.data_type	= QMI_STRUCT,
+		.elem_len	= 1,
+		.elem_size	= sizeof(struct qmi_response_type_v01),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x02,
+		.offset		= offsetof(
+			struct ipa_get_stats_per_client_resp_msg_v01,
+			resp),
+		.ei_array	= get_qmi_response_type_v01_ei(),
+	},
+	{
+		.data_type	= QMI_OPT_FLAG,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x10,
+		.offset		= offsetof(
+			struct ipa_get_stats_per_client_resp_msg_v01,
+			per_client_stats_list_valid),
+	},
+	{
+		.data_type	= QMI_DATA_LEN,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x10,
+		.offset		= offsetof(
+			struct ipa_get_stats_per_client_resp_msg_v01,
+			per_client_stats_list_len),
+	},
+	{
+		.data_type	= QMI_STRUCT,
+		.elem_len	= QMI_IPA_MAX_PER_CLIENTS_V01,
+		.elem_size	=
+			sizeof(struct ipa_per_client_stats_info_type_v01),
+		.is_array	= VAR_LEN_ARRAY,
+		.tlv_type	= 0x10,
+		.offset		= offsetof(
+			struct ipa_get_stats_per_client_resp_msg_v01,
+			per_client_stats_list),
+		.ei_array	=
+			ipa3_per_client_stats_info_type_data_v01_ei,
+	},
+	{
+		.data_type	= QMI_EOTI,
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+	},
+};
+
+struct elem_info ipa3_configure_ul_firewall_rules_req_msg_data_v01_ei[] = {
+	{
+		.data_type	= QMI_DATA_LEN,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x1,
+		.offset		= offsetof(
+			struct ipa_configure_ul_firewall_rules_req_msg_v01,
+			firewall_rules_list_len),
+	},
+	{
+		.data_type	= QMI_STRUCT,
+		.elem_len	= QMI_IPA_MAX_UL_FIREWALL_RULES_V01,
+		.elem_size	= sizeof(struct ipa_ul_firewall_rule_type_v01),
+		.is_array	= VAR_LEN_ARRAY,
+		.tlv_type	= 0x1,
+		.offset		= offsetof(
+			struct ipa_configure_ul_firewall_rules_req_msg_v01,
+			firewall_rules_list),
+		.ei_array	=
+			ipa3_ul_firewall_rule_type_data_v01_ei,
+	},
+	{
+		.data_type	= QMI_UNSIGNED_4_BYTE,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint32_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x2,
+		.offset		= offsetof(
+			struct ipa_configure_ul_firewall_rules_req_msg_v01,
+			mux_id),
+	},
+	{
+		.data_type	= QMI_OPT_FLAG,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x10,
+		.offset		= offsetof(
+			struct ipa_configure_ul_firewall_rules_req_msg_v01,
+			disable_valid),
+	},
+	{
+		.data_type	= QMI_UNSIGNED_1_BYTE,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x10,
+		.offset		= offsetof(
+			struct ipa_configure_ul_firewall_rules_req_msg_v01,
+			disable),
+	},
+	{
+		.data_type	= QMI_OPT_FLAG,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x11,
+		.offset		= offsetof(
+			struct ipa_configure_ul_firewall_rules_req_msg_v01,
+			are_blacklist_filters_valid),
+	},
+	{
+		.data_type	= QMI_UNSIGNED_1_BYTE,
+		.elem_len	= 1,
+		.elem_size	= sizeof(uint8_t),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x11,
+		.offset		= offsetof(
+			struct ipa_configure_ul_firewall_rules_req_msg_v01,
+			are_blacklist_filters),
+	},
+	{
+		.data_type	= QMI_EOTI,
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+	},
+};
+
+struct elem_info ipa3_configure_ul_firewall_rules_resp_msg_data_v01_ei[] = {
+	{
+		.data_type	= QMI_STRUCT,
+		.elem_len	= 1,
+		.elem_size	= sizeof(struct qmi_response_type_v01),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x02,
+		.offset		= offsetof(
+			struct ipa_configure_ul_firewall_rules_resp_msg_v01,
+			resp),
+		.ei_array	= get_qmi_response_type_v01_ei(),
+	},
+	{
+		.data_type	= QMI_EOTI,
+		.is_array	= NO_ARRAY,
+		.tlv_type	= QMI_COMMON_TLV_TYPE,
+	},
+};
+
+struct elem_info ipa3_configure_ul_firewall_rules_ind_msg_data_v01_ei[] = {
+	{
+		.data_type	= QMI_STRUCT,
+		.elem_len	= 1,
+		.elem_size	= sizeof(
+			struct ipa_ul_firewall_config_result_type_v01),
+		.is_array	= NO_ARRAY,
+		.tlv_type	= 0x01,
+		.offset		= offsetof(
+			struct ipa_configure_ul_firewall_rules_ind_msg_v01,
+			result),
+		.ei_array	=
+		ipa3_ul_firewall_config_result_type_data_v01_ei,
 	},
 	{
 		.data_type	= QMI_EOTI,
