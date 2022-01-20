@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -43,7 +43,7 @@ static int ipa_generate_hdr_hw_tbl(struct ipa_mem_buffer *mem)
 		IPAERR("hdr tbl empty\n");
 		return -EPERM;
 	}
-	IPADBG("tbl_sz=%d\n", ipa_ctx->hdr_tbl.end);
+	IPADBG_LOW("tbl_sz=%d\n", ipa_ctx->hdr_tbl.end);
 
 	mem->base = dma_alloc_coherent(ipa_ctx->pdev, mem->size,
 			&mem->phys_base, GFP_KERNEL);
@@ -57,7 +57,7 @@ static int ipa_generate_hdr_hw_tbl(struct ipa_mem_buffer *mem)
 			link) {
 		if (entry->is_hdr_proc_ctx)
 			continue;
-		IPADBG("hdr of len %d ofst=%d\n", entry->hdr_len,
+		IPADBG_LOW("hdr of len %d ofst=%d\n", entry->hdr_len,
 				entry->offset_entry->offset);
 		memcpy(mem->base + entry->offset_entry->offset, entry->hdr,
 				entry->hdr_len);
@@ -74,7 +74,7 @@ static void ipa_hdr_proc_ctx_to_hw_format(struct ipa_mem_buffer *mem,
 	list_for_each_entry(entry,
 			&ipa_ctx->hdr_proc_ctx_tbl.head_proc_ctx_entry_list,
 			link) {
-		IPADBG("processing type %d ofst=%d\n",
+		IPADBG_LOW("processing type %d ofst=%d\n",
 			entry->type, entry->offset_entry->offset);
 		if (entry->type == IPA_HDR_PROC_NONE) {
 			struct ipa_hdr_proc_ctx_add_hdr_seq *ctx;
@@ -88,7 +88,7 @@ static void ipa_hdr_proc_ctx_to_hw_format(struct ipa_mem_buffer *mem,
 				entry->hdr->phys_base :
 				hdr_base_addr +
 				entry->hdr->offset_entry->offset;
-			IPADBG("header address 0x%x\n",
+			IPADBG_LOW("header address 0x%x\n",
 				ctx->hdr_add.hdr_addr);
 			ctx->end.type = IPA_PROC_CTX_TLV_TYPE_END;
 			ctx->end.length = 0;
@@ -105,7 +105,7 @@ static void ipa_hdr_proc_ctx_to_hw_format(struct ipa_mem_buffer *mem,
 				entry->hdr->phys_base :
 				hdr_base_addr +
 				entry->hdr->offset_entry->offset;
-			IPADBG("header address 0x%x\n",
+			IPADBG_LOW("header address 0x%x\n",
 				ctx->hdr_add.hdr_addr);
 			ctx->cmd.type = IPA_PROC_CTX_TLV_TYPE_PROC_CMD;
 			ctx->cmd.length = 0;
@@ -117,7 +117,7 @@ static void ipa_hdr_proc_ctx_to_hw_format(struct ipa_mem_buffer *mem,
 				ctx->cmd.value = IPA_HDR_UCP_802_3_TO_ETHII;
 			else if (entry->type == IPA_HDR_PROC_802_3_TO_802_3)
 				ctx->cmd.value = IPA_HDR_UCP_802_3_TO_802_3;
-			IPADBG("command id %d\n", ctx->cmd.value);
+			IPADBG_LOW("command id %d\n", ctx->cmd.value);
 			ctx->end.type = IPA_PROC_CTX_TLV_TYPE_END;
 			ctx->end.length = 0;
 			ctx->end.value = 0;
@@ -144,7 +144,7 @@ static int ipa_generate_hdr_proc_ctx_hw_tbl(u32 hdr_sys_addr,
 	/* make sure table is aligned */
 	mem->size += IPA_HDR_PROC_CTX_TABLE_ALIGNMENT_BYTE;
 
-	IPADBG("tbl_sz=%d\n", ipa_ctx->hdr_proc_ctx_tbl.end);
+	IPADBG_LOW("tbl_sz=%d\n", ipa_ctx->hdr_proc_ctx_tbl.end);
 
 	mem->base = dma_alloc_coherent(ipa_ctx->pdev, mem->size,
 			&mem->phys_base, GFP_KERNEL);
@@ -176,6 +176,7 @@ int __ipa_commit_hdr_v1_1(void)
 	struct ipa_mem_buffer *mem;
 	struct ipa_hdr_init_local *cmd;
 	u16 len;
+	gfp_t flag = GFP_KERNEL | (ipa_ctx->use_dma_zone ? GFP_DMA : 0);
 
 	mem = kmalloc(sizeof(struct ipa_mem_buffer), GFP_KERNEL);
 	if (!mem) {
@@ -190,7 +191,7 @@ int __ipa_commit_hdr_v1_1(void)
 	 * we can use init_local ptr for init_system due to layout of the
 	 * struct
 	 */
-	cmd = kmalloc(len, GFP_KERNEL);
+	cmd = kmalloc(len, flag);
 	if (!cmd) {
 		IPAERR("failed to alloc immediate command object\n");
 		goto fail_alloc_cmd;
@@ -268,6 +269,7 @@ int __ipa_commit_hdr_v2(void)
 	struct ipa_mem_buffer mem;
 	struct ipa_hdr_init_system *cmd = NULL;
 	struct ipa_hw_imm_cmd_dma_shared_mem *dma_cmd = NULL;
+	gfp_t flag = GFP_ATOMIC | (ipa_ctx->use_dma_zone ? GFP_DMA : 0);
 	int rc = -EFAULT;
 
 	if (ipa_generate_hdr_hw_tbl(&mem)) {
@@ -281,7 +283,7 @@ int __ipa_commit_hdr_v2(void)
 				IPA_MEM_PART(apps_hdr_size));
 			goto fail_send_cmd;
 		} else {
-			dma_cmd = kzalloc(sizeof(*dma_cmd), GFP_ATOMIC);
+			dma_cmd = kzalloc(sizeof(*dma_cmd), flag);
 			if (dma_cmd == NULL) {
 				IPAERR("fail to alloc immediate cmd\n");
 				rc = -ENOMEM;
@@ -303,7 +305,7 @@ int __ipa_commit_hdr_v2(void)
 				IPA_MEM_PART(apps_hdr_size_ddr));
 			goto fail_send_cmd;
 		} else {
-			cmd = kzalloc(sizeof(*cmd), GFP_ATOMIC);
+			cmd = kzalloc(sizeof(*cmd), flag);
 			if (cmd == NULL) {
 				IPAERR("fail to alloc hdr init cmd\n");
 				rc = -ENOMEM;
@@ -359,6 +361,7 @@ int __ipa_commit_hdr_v2_5(void)
 	struct ipa_hw_imm_cmd_dma_shared_mem *dma_cmd_hdr = NULL;
 	struct ipa_hw_imm_cmd_dma_shared_mem *dma_cmd_ctx = NULL;
 	struct ipa_register_write *reg_write_cmd = NULL;
+	gfp_t flag = GFP_ATOMIC | (ipa_ctx->use_dma_zone ? GFP_DMA : 0);
 	int rc = -EFAULT;
 	u32 proc_ctx_size;
 	u32 proc_ctx_ofst;
@@ -383,7 +386,7 @@ int __ipa_commit_hdr_v2_5(void)
 				IPA_MEM_PART(apps_hdr_size));
 			goto fail_send_cmd1;
 		} else {
-			dma_cmd_hdr = kzalloc(sizeof(*dma_cmd_hdr), GFP_ATOMIC);
+			dma_cmd_hdr = kzalloc(sizeof(*dma_cmd_hdr), flag);
 			if (dma_cmd_hdr == NULL) {
 				IPAERR("fail to alloc immediate cmd\n");
 				rc = -ENOMEM;
@@ -406,7 +409,7 @@ int __ipa_commit_hdr_v2_5(void)
 			goto fail_send_cmd1;
 		} else {
 			hdr_init_cmd = kzalloc(sizeof(*hdr_init_cmd),
-				GFP_ATOMIC);
+				flag);
 			if (hdr_init_cmd == NULL) {
 				IPAERR("fail to alloc immediate cmd\n");
 				rc = -ENOMEM;
@@ -431,7 +434,7 @@ int __ipa_commit_hdr_v2_5(void)
 			goto fail_send_cmd1;
 		} else {
 			dma_cmd_ctx = kzalloc(sizeof(*dma_cmd_ctx),
-				GFP_ATOMIC);
+				flag);
 			if (dma_cmd_ctx == NULL) {
 				IPAERR("fail to alloc immediate cmd\n");
 				rc = -ENOMEM;
@@ -456,7 +459,7 @@ int __ipa_commit_hdr_v2_5(void)
 			goto fail_send_cmd1;
 		} else {
 			reg_write_cmd = kzalloc(sizeof(*reg_write_cmd),
-				GFP_ATOMIC);
+				flag);
 			if (reg_write_cmd == NULL) {
 				IPAERR("fail to alloc immediate cmd\n");
 				rc = -ENOMEM;
@@ -540,7 +543,7 @@ int __ipa_commit_hdr_v2_6L(void)
 }
 
 static int __ipa_add_hdr_proc_ctx(struct ipa_hdr_proc_ctx_add *proc_ctx,
-	bool add_ref_hdr)
+	bool add_ref_hdr, bool user_only)
 {
 	struct ipa_hdr_entry *hdr_entry;
 	struct ipa_hdr_proc_ctx_entry *entry;
@@ -549,8 +552,9 @@ static int __ipa_add_hdr_proc_ctx(struct ipa_hdr_proc_ctx_add *proc_ctx,
 	struct ipa_hdr_proc_ctx_tbl *htbl = &ipa_ctx->hdr_proc_ctx_tbl;
 	int id;
 	int needed_len;
+	int mem_size;
 
-	IPADBG("processing type %d hdr_hdl %d\n",
+	IPADBG_LOW("processing type %d hdr_hdl %d\n",
 		proc_ctx->type, proc_ctx->hdr_hdl);
 
 	if (!HDR_PROC_TYPE_IS_VALID(proc_ctx->type)) {
@@ -577,6 +581,7 @@ static int __ipa_add_hdr_proc_ctx(struct ipa_hdr_proc_ctx_add *proc_ctx,
 	if (add_ref_hdr)
 		hdr_entry->ref_cnt++;
 	entry->cookie = IPA_PROC_HDR_COOKIE;
+	entry->ipacm_installed = user_only;
 
 	needed_len = (proc_ctx->type == IPA_HDR_PROC_NONE) ?
 			sizeof(struct ipa_hdr_proc_ctx_add_hdr_seq) :
@@ -593,7 +598,15 @@ static int __ipa_add_hdr_proc_ctx(struct ipa_hdr_proc_ctx_add *proc_ctx,
 		goto bad_len;
 	}
 
+	mem_size = (ipa_ctx->hdr_proc_ctx_tbl_lcl) ?
+		IPA_MEM_PART(apps_hdr_proc_ctx_size) :
+		IPA_MEM_PART(apps_hdr_proc_ctx_size_ddr);
 	if (list_empty(&htbl->head_free_offset_list[bin])) {
+		if (htbl->end + ipa_hdr_proc_ctx_bin_sz[bin] > mem_size) {
+			IPAERR_RL("hdr proc ctx table overflow\n");
+			goto bad_len;
+		}
+
 		offset = kmem_cache_zalloc(ipa_ctx->hdr_proc_ctx_offset_cache,
 					   GFP_KERNEL);
 		if (!offset) {
@@ -607,6 +620,7 @@ static int __ipa_add_hdr_proc_ctx(struct ipa_hdr_proc_ctx_add *proc_ctx,
 		 */
 		offset->offset = htbl->end;
 		offset->bin = bin;
+		offset->ipacm_installed = user_only;
 		htbl->end += ipa_hdr_proc_ctx_bin_sz[bin];
 		list_add(&offset->link,
 				&htbl->head_offset_list[bin]);
@@ -615,13 +629,14 @@ static int __ipa_add_hdr_proc_ctx(struct ipa_hdr_proc_ctx_add *proc_ctx,
 		offset =
 		    list_first_entry(&htbl->head_free_offset_list[bin],
 				    struct ipa_hdr_proc_ctx_offset_entry, link);
+		offset->ipacm_installed = user_only;
 		list_move(&offset->link, &htbl->head_offset_list[bin]);
 	}
 
 	entry->offset_entry = offset;
 	list_add(&entry->link, &htbl->head_proc_ctx_entry_list);
 	htbl->proc_ctx_cnt++;
-	IPADBG("add proc ctx of sz=%d cnt=%d ofst=%d\n", needed_len,
+	IPADBG_LOW("add proc ctx of sz=%d cnt=%d ofst=%d\n", needed_len,
 			htbl->proc_ctx_cnt, offset->offset);
 
 	id = ipa_id_alloc(entry);
@@ -637,12 +652,12 @@ static int __ipa_add_hdr_proc_ctx(struct ipa_hdr_proc_ctx_add *proc_ctx,
 	return 0;
 
 ipa_insert_failed:
-	if (offset)
-		list_move(&offset->link,
+	list_move(&offset->link,
 		&htbl->head_free_offset_list[offset->bin]);
 	entry->offset_entry = NULL;
 	list_del(&entry->link);
 	htbl->proc_ctx_cnt--;
+
 bad_len:
 	if (add_ref_hdr)
 		hdr_entry->ref_cnt--;
@@ -652,7 +667,7 @@ bad_len:
 }
 
 
-static int __ipa_add_hdr(struct ipa_hdr_add *hdr)
+static int __ipa_add_hdr(struct ipa_hdr_add *hdr, bool user)
 {
 	struct ipa_hdr_entry *entry;
 	struct ipa_hdr_offset_entry *offset = NULL;
@@ -660,6 +675,7 @@ static int __ipa_add_hdr(struct ipa_hdr_add *hdr)
 	struct ipa_hdr_tbl *htbl = &ipa_ctx->hdr_tbl;
 	int id;
 	int mem_size;
+	gfp_t flag = GFP_KERNEL | (ipa_ctx->use_dma_zone ? GFP_DMA : 0);
 
 	if (hdr->hdr_len == 0 || hdr->hdr_len > IPA_HDR_MAX_SIZE) {
 		IPAERR_RL("bad parm\n");
@@ -671,7 +687,7 @@ static int __ipa_add_hdr(struct ipa_hdr_add *hdr)
 		goto error;
 	}
 
-	entry = kmem_cache_zalloc(ipa_ctx->hdr_cache, GFP_KERNEL);
+	entry = kmem_cache_zalloc(ipa_ctx->hdr_cache, flag);
 	if (!entry) {
 		IPAERR("failed to alloc hdr object\n");
 		goto error;
@@ -687,6 +703,7 @@ static int __ipa_add_hdr(struct ipa_hdr_add *hdr)
 	entry->is_eth2_ofst_valid = hdr->is_eth2_ofst_valid;
 	entry->eth2_ofst = hdr->eth2_ofst;
 	entry->cookie = IPA_HDR_COOKIE;
+	entry->ipacm_installed = user;
 
 	if (hdr->hdr_len <= ipa_hdr_bin_sz[IPA_HDR_BIN0])
 		bin = IPA_HDR_BIN0;
@@ -706,25 +723,30 @@ static int __ipa_add_hdr(struct ipa_hdr_add *hdr)
 	mem_size = (ipa_ctx->hdr_tbl_lcl) ? IPA_MEM_PART(apps_hdr_size) :
 		IPA_MEM_PART(apps_hdr_size_ddr);
 
-	/*
-	 * if header does not fit to table, place it in DDR
-	 * This is valid for IPA 2.5 and on,
-	 * with the exception of IPA2.6L.
-	 */
-	if (htbl->end + ipa_hdr_bin_sz[bin] > mem_size) {
-		if (ipa_ctx->ipa_hw_type != IPA_HW_v2_5) {
-			IPAERR("not enough room for header\n");
-			goto bad_hdr_len;
+	if (list_empty(&htbl->head_free_offset_list[bin])) {
+		/*
+		 * if header does not fit to table, place it in DDR
+		 * This is valid for IPA 2.5 and on,
+		 * with the exception of IPA2.6L.
+		 */
+		if (htbl->end + ipa_hdr_bin_sz[bin] > mem_size) {
+			if (ipa_ctx->ipa_hw_type != IPA_HW_v2_5) {
+				IPAERR("not enough room for header\n");
+				goto bad_hdr_len;
+			} else {
+				entry->is_hdr_proc_ctx = true;
+				entry->phys_base = dma_map_single(ipa_ctx->pdev,
+					entry->hdr,
+					entry->hdr_len,
+					DMA_TO_DEVICE);
+				if (dma_mapping_error(ipa_ctx->pdev,
+					entry->phys_base)) {
+					IPAERR("dma_map_single failureed\n");
+					goto fail_dma_mapping;
+				}
+			}
 		} else {
-			entry->is_hdr_proc_ctx = true;
-			entry->phys_base = dma_map_single(ipa_ctx->pdev,
-				entry->hdr,
-				entry->hdr_len,
-				DMA_TO_DEVICE);
-		}
-	} else {
-		entry->is_hdr_proc_ctx = false;
-		if (list_empty(&htbl->head_free_offset_list[bin])) {
+			entry->is_hdr_proc_ctx = false;
 			offset = kmem_cache_zalloc(ipa_ctx->hdr_offset_cache,
 						   GFP_KERNEL);
 			if (!offset) {
@@ -741,26 +763,29 @@ static int __ipa_add_hdr(struct ipa_hdr_add *hdr)
 			htbl->end += ipa_hdr_bin_sz[bin];
 			list_add(&offset->link,
 					&htbl->head_offset_list[bin]);
-		} else {
-			/* get the first free slot */
-			offset =
-			list_first_entry(&htbl->head_free_offset_list[bin],
-					struct ipa_hdr_offset_entry, link);
-			list_move(&offset->link, &htbl->head_offset_list[bin]);
+			entry->offset_entry = offset;
+			offset->ipacm_installed = user;
 		}
-
+	} else {
+		entry->is_hdr_proc_ctx = false;
+		/* get the first free slot */
+		offset =
+		list_first_entry(&htbl->head_free_offset_list[bin],
+				struct ipa_hdr_offset_entry, link);
+		list_move(&offset->link, &htbl->head_offset_list[bin]);
 		entry->offset_entry = offset;
+		offset->ipacm_installed = user;
 	}
 
 	list_add(&entry->link, &htbl->head_hdr_entry_list);
 	htbl->hdr_cnt++;
 	if (entry->is_hdr_proc_ctx)
-		IPADBG("add hdr of sz=%d hdr_cnt=%d phys_base=%pa\n",
+		IPADBG_LOW("add hdr of sz=%d hdr_cnt=%d phys_base=%pa\n",
 			hdr->hdr_len,
 			htbl->hdr_cnt,
 			&entry->phys_base);
 	else
-		IPADBG("add hdr of sz=%d hdr_cnt=%d ofst=%d\n",
+		IPADBG_LOW("add hdr of sz=%d hdr_cnt=%d ofst=%d\n",
 			hdr->hdr_len,
 			htbl->hdr_cnt,
 			entry->offset_entry->offset);
@@ -769,7 +794,7 @@ static int __ipa_add_hdr(struct ipa_hdr_add *hdr)
 	if (id < 0) {
 		IPAERR("failed to alloc id\n");
 		WARN_ON(1);
-		 goto ipa_insert_failed;
+		goto ipa_insert_failed;
 	}
 	entry->id = id;
 	hdr->hdr_hdl = id;
@@ -781,7 +806,7 @@ static int __ipa_add_hdr(struct ipa_hdr_add *hdr)
 		IPADBG("adding processing context for header %s\n", hdr->name);
 		proc_ctx.type = IPA_HDR_PROC_NONE;
 		proc_ctx.hdr_hdl = id;
-		if (__ipa_add_hdr_proc_ctx(&proc_ctx, false)) {
+		if (__ipa_add_hdr_proc_ctx(&proc_ctx, false, user)) {
 			IPAERR("failed to add hdr proc ctx\n");
 			goto fail_add_proc_ctx;
 		}
@@ -795,7 +820,7 @@ fail_add_proc_ctx:
 	hdr->hdr_hdl = 0;
 	ipa_id_remove(id);
 ipa_insert_failed:
-	 if (entry->is_hdr_proc_ctx) {
+	if (entry->is_hdr_proc_ctx) {
 		dma_unmap_single(ipa_ctx->pdev, entry->phys_base,
 			entry->hdr_len, DMA_TO_DEVICE);
 	} else {
@@ -804,9 +829,11 @@ ipa_insert_failed:
 			&htbl->head_free_offset_list[offset->bin]);
 		entry->offset_entry = NULL;
 	}
-
 	htbl->hdr_cnt--;
 	list_del(&entry->link);
+
+fail_dma_mapping:
+	entry->is_hdr_proc_ctx = false;
 bad_hdr_len:
 	entry->cookie = 0;
 	kmem_cache_free(ipa_ctx->hdr_cache, entry);
@@ -872,16 +899,20 @@ int __ipa_del_hdr(u32 hdr_hdl, bool by_user)
 		return -EINVAL;
 	}
 
-	if (!entry || (entry->cookie != IPA_HDR_COOKIE)) {
+	if (entry->cookie != IPA_HDR_COOKIE) {
 		IPAERR_RL("bad parm\n");
 		return -EINVAL;
 	}
 
-	IPADBG("del hdr of sz=%d hdr_cnt=%d ofst=%d\n", entry->hdr_len,
+	if (entry->is_hdr_proc_ctx)
+		IPADBG("del hdr of sz=%d hdr_cnt=%d phys_base=%pa\n",
+			entry->hdr_len, htbl->hdr_cnt, &entry->phys_base);
+	else
+		IPADBG("del hdr of sz=%d hdr_cnt=%d ofst=%d\n", entry->hdr_len,
 			htbl->hdr_cnt, entry->offset_entry->offset);
 
 	if (by_user && entry->user_deleted) {
-		IPAERR("hdr already deleted by user\n");
+		IPAERR_RL("hdr already deleted by user\n");
 		return -EINVAL;
 	}
 
@@ -925,7 +956,7 @@ int __ipa_del_hdr(u32 hdr_hdl, bool by_user)
 }
 
 /**
- * ipa_add_hdr() - add the specified headers to SW and optionally commit them to
+ * ipa2_add_hdr() - add the specified headers to SW and optionally commit them to
  * IPA HW
  * @hdrs:	[inout] set of headers to add
  *
@@ -933,13 +964,28 @@ int __ipa_del_hdr(u32 hdr_hdl, bool by_user)
  *
  * Note:	Should not be called from atomic context
  */
-int ipa_add_hdr(struct ipa_ioc_add_hdr *hdrs)
+int ipa2_add_hdr(struct ipa_ioc_add_hdr *hdrs)
+{
+	return ipa2_add_hdr_usr(hdrs, false);
+}
+
+/**
+ * ipa2_add_hdr_usr() - add the specified headers to SW
+ * and optionally commit them to IPA HW
+ * @hdrs:		[inout] set of headers to add
+ * @user_only:	[in] indicate installed from user
+ *
+ * Returns:	0 on success, negative on failure
+ *
+ * Note:	Should not be called from atomic context
+ */
+int ipa2_add_hdr_usr(struct ipa_ioc_add_hdr *hdrs, bool user_only)
 {
 	int i;
 	int result = -EFAULT;
 
 	if (unlikely(!ipa_ctx)) {
-		IPAERR("IPA driver was not initialized\n");
+		IPAERR_RL("IPA driver was not initialized\n");
 		return -EINVAL;
 	}
 
@@ -952,7 +998,7 @@ int ipa_add_hdr(struct ipa_ioc_add_hdr *hdrs)
 	IPADBG("adding %d headers to IPA driver internal data struct\n",
 			hdrs->num_hdrs);
 	for (i = 0; i < hdrs->num_hdrs; i++) {
-		if (__ipa_add_hdr(&hdrs->hdr[i])) {
+		if (__ipa_add_hdr(&hdrs->hdr[i], user_only)) {
 			IPAERR_RL("failed to add hdr %d\n", i);
 			hdrs->hdr[i].status = -1;
 		} else {
@@ -972,10 +1018,8 @@ bail:
 	mutex_unlock(&ipa_ctx->lock);
 	return result;
 }
-EXPORT_SYMBOL(ipa_add_hdr);
-
 /**
- * ipa_del_hdr_by_user() - Remove the specified headers
+ * ipa2_del_hdr_by_user() - Remove the specified headers
  * from SW and optionally commit them to IPA HW
  * @hdls:	[inout] set of headers to delete
  * @by_user:	Operation requested by user?
@@ -984,7 +1028,7 @@ EXPORT_SYMBOL(ipa_add_hdr);
  *
  * Note:	Should not be called from atomic context
  */
-int ipa_del_hdr_by_user(struct ipa_ioc_del_hdr *hdls, bool by_user)
+int ipa2_del_hdr_by_user(struct ipa_ioc_del_hdr *hdls, bool by_user)
 {
 	int i;
 	int result = -EFAULT;
@@ -1022,7 +1066,7 @@ bail:
 }
 
 /**
- * ipa_del_hdr() - Remove the specified headers from SW and optionally commit them
+ * ipa2_del_hdr() - Remove the specified headers from SW and optionally commit them
  * to IPA HW
  * @hdls:	[inout] set of headers to delete
  *
@@ -1030,29 +1074,30 @@ bail:
  *
  * Note:	Should not be called from atomic context
  */
-int ipa_del_hdr(struct ipa_ioc_del_hdr *hdls)
+int ipa2_del_hdr(struct ipa_ioc_del_hdr *hdls)
 {
-	return ipa_del_hdr_by_user(hdls, false);
+	return ipa2_del_hdr_by_user(hdls, false);
 }
-EXPORT_SYMBOL(ipa_del_hdr);
 
 /**
- * ipa_add_hdr_proc_ctx() - add the specified headers to SW
+ * ipa2_add_hdr_proc_ctx() - add the specified headers to SW
  * and optionally commit them to IPA HW
  * @proc_ctxs:	[inout] set of processing context headers to add
+ * @user_only:	[in] indicate installed by user-space module
  *
  * Returns:	0 on success, negative on failure
  *
  * Note:	Should not be called from atomic context
  */
-int ipa_add_hdr_proc_ctx(struct ipa_ioc_add_hdr_proc_ctx *proc_ctxs)
+int ipa2_add_hdr_proc_ctx(struct ipa_ioc_add_hdr_proc_ctx *proc_ctxs,
+							bool user_only)
 {
 	int i;
 	int result = -EFAULT;
 
 	if (ipa_ctx->ipa_hw_type <= IPA_HW_v2_0 ||
 	    ipa_ctx->ipa_hw_type == IPA_HW_v2_6L) {
-		IPAERR("Processing context not supported on IPA HW %d\n",
+		IPAERR_RL("Processing context not supported on IPA HW %d\n",
 			ipa_ctx->ipa_hw_type);
 		return -EFAULT;
 	}
@@ -1066,7 +1111,8 @@ int ipa_add_hdr_proc_ctx(struct ipa_ioc_add_hdr_proc_ctx *proc_ctxs)
 	IPADBG("adding %d header processing contextes to IPA driver\n",
 			proc_ctxs->num_proc_ctxs);
 	for (i = 0; i < proc_ctxs->num_proc_ctxs; i++) {
-		if (__ipa_add_hdr_proc_ctx(&proc_ctxs->proc_ctx[i], true)) {
+		if (__ipa_add_hdr_proc_ctx(&proc_ctxs->proc_ctx[i],
+				true, user_only)) {
 			IPAERR_RL("failed to add hdr pric ctx %d\n", i);
 			proc_ctxs->proc_ctx[i].status = -1;
 		} else {
@@ -1086,10 +1132,9 @@ bail:
 	mutex_unlock(&ipa_ctx->lock);
 	return result;
 }
-EXPORT_SYMBOL(ipa_add_hdr_proc_ctx);
 
 /**
- * ipa_del_hdr_proc_ctx_by_user() -
+ * ipa2_del_hdr_proc_ctx_by_user() -
  * Remove the specified processing context headers from SW and
  * optionally commit them to IPA HW.
  * @hdls:	[inout] set of processing context headers to delete
@@ -1099,7 +1144,7 @@ EXPORT_SYMBOL(ipa_add_hdr_proc_ctx);
  *
  * Note:	Should not be called from atomic context
  */
-int ipa_del_hdr_proc_ctx_by_user(struct ipa_ioc_del_hdr_proc_ctx *hdls,
+int ipa2_del_hdr_proc_ctx_by_user(struct ipa_ioc_del_hdr_proc_ctx *hdls,
 	bool by_user)
 {
 	int i;
@@ -1140,7 +1185,7 @@ bail:
 }
 
 /**
- * ipa_del_hdr_proc_ctx() -
+ * ipa2_del_hdr_proc_ctx() -
  * Remove the specified processing context headers from SW and
  * optionally commit them to IPA HW.
  * @hdls:	[inout] set of processing context headers to delete
@@ -1149,20 +1194,19 @@ bail:
  *
  * Note:	Should not be called from atomic context
  */
-int ipa_del_hdr_proc_ctx(struct ipa_ioc_del_hdr_proc_ctx *hdls)
+int ipa2_del_hdr_proc_ctx(struct ipa_ioc_del_hdr_proc_ctx *hdls)
 {
-	return ipa_del_hdr_proc_ctx_by_user(hdls, false);
+	return ipa2_del_hdr_proc_ctx_by_user(hdls, false);
 }
-EXPORT_SYMBOL(ipa_del_hdr_proc_ctx);
 
 /**
- * ipa_commit_hdr() - commit to IPA HW the current header table in SW
+ * ipa2_commit_hdr() - commit to IPA HW the current header table in SW
  *
  * Returns:	0 on success, negative on failure
  *
  * Note:	Should not be called from atomic context
  */
-int ipa_commit_hdr(void)
+int ipa2_commit_hdr(void)
 {
 	int result = -EFAULT;
 
@@ -1170,9 +1214,9 @@ int ipa_commit_hdr(void)
 	 * issue a commit on the routing module since routing rules point to
 	 * header table entries
 	 */
-	if (ipa_commit_rt(IPA_IP_v4))
+	if (ipa2_commit_rt(IPA_IP_v4))
 		return -EPERM;
-	if (ipa_commit_rt(IPA_IP_v6))
+	if (ipa2_commit_rt(IPA_IP_v6))
 		return -EPERM;
 
 	mutex_lock(&ipa_ctx->lock);
@@ -1185,17 +1229,17 @@ bail:
 	mutex_unlock(&ipa_ctx->lock);
 	return result;
 }
-EXPORT_SYMBOL(ipa_commit_hdr);
 
 /**
- * ipa_reset_hdr() - reset the current header table in SW (does not commit to
+ * ipa2_reset_hdr() - reset the current header table in SW (does not commit to
  * HW)
  *
+ * @user_only:	[in] indicate delete rules installed by userspace
  * Returns:	0 on success, negative on failure
  *
  * Note:	Should not be called from atomic context
  */
-int ipa_reset_hdr(void)
+int ipa2_reset_hdr(bool user_only)
 {
 	struct ipa_hdr_entry *entry;
 	struct ipa_hdr_entry *next;
@@ -1205,15 +1249,17 @@ int ipa_reset_hdr(void)
 	struct ipa_hdr_offset_entry *off_next;
 	struct ipa_hdr_proc_ctx_offset_entry *ctx_off_entry;
 	struct ipa_hdr_proc_ctx_offset_entry *ctx_off_next;
+	struct ipa_hdr_tbl *htbl = &ipa_ctx->hdr_tbl;
+	struct ipa_hdr_proc_ctx_tbl *htbl_proc = &ipa_ctx->hdr_proc_ctx_tbl;
 	int i;
 
 	/*
 	 * issue a reset on the routing module since routing rules point to
 	 * header table entries
 	 */
-	if (ipa_reset_rt(IPA_IP_v4))
+	if (ipa2_reset_rt(IPA_IP_v4, user_only))
 		IPAERR("fail to reset v4 rt\n");
-	if (ipa_reset_rt(IPA_IP_v6))
+	if (ipa2_reset_rt(IPA_IP_v6, user_only))
 		IPAERR("fail to reset v4 rt\n");
 
 	mutex_lock(&ipa_ctx->lock);
@@ -1229,6 +1275,7 @@ int ipa_reset_hdr(void)
 				if (entry->is_hdr_proc_ctx) {
 					mutex_unlock(&ipa_ctx->lock);
 					WARN_ON(1);
+					IPAERR("default header is proc ctx\n");
 					return -EFAULT;
 				}
 				IPADBG("skip default header\n");
@@ -1237,51 +1284,64 @@ int ipa_reset_hdr(void)
 		}
 
 		if (ipa_id_find(entry->id) == NULL) {
-			WARN_ON(1);
 			mutex_unlock(&ipa_ctx->lock);
+			WARN_ON(1);
 			return -EFAULT;
 		}
-		if (entry->is_hdr_proc_ctx) {
-			dma_unmap_single(ipa_ctx->pdev,
-				entry->phys_base,
-				entry->hdr_len,
-				DMA_TO_DEVICE);
-			entry->proc_ctx = NULL;
+
+		if (!user_only || entry->ipacm_installed) {
+			if (entry->is_hdr_proc_ctx) {
+				dma_unmap_single(ipa_ctx->pdev,
+					entry->phys_base,
+					entry->hdr_len,
+					DMA_TO_DEVICE);
+				entry->proc_ctx = NULL;
+			} else {
+				/* move the offset entry to free list */
+				entry->offset_entry->ipacm_installed = 0;
+				list_move(&entry->offset_entry->link,
+				&htbl->head_free_offset_list[
+					entry->offset_entry->bin]);
+			}
+			list_del(&entry->link);
+			htbl->hdr_cnt--;
+			entry->ref_cnt = 0;
+			entry->cookie = 0;
+
+			/* remove the handle from the database */
+			ipa_id_remove(entry->id);
+			kmem_cache_free(ipa_ctx->hdr_cache, entry);
 		}
-		list_del(&entry->link);
-		entry->ref_cnt = 0;
-		entry->cookie = 0;
-
-		/* remove the handle from the database */
-		ipa_id_remove(entry->id);
-		kmem_cache_free(ipa_ctx->hdr_cache, entry);
-
 	}
-	for (i = 0; i < IPA_HDR_BIN_MAX; i++) {
-		list_for_each_entry_safe(off_entry, off_next,
-					 &ipa_ctx->hdr_tbl.head_offset_list[i],
-					 link) {
 
-			/*
-			 * do not remove the default exception header which is
-			 * at offset 0
-			 */
-			if (off_entry->offset == 0)
-				continue;
-
-			list_del(&off_entry->link);
-			kmem_cache_free(ipa_ctx->hdr_offset_cache, off_entry);
-		}
-		list_for_each_entry_safe(off_entry, off_next,
+	/* only clean up offset_list and free_offset_list on global reset */
+	if (!user_only) {
+		for (i = 0; i < IPA_HDR_BIN_MAX; i++) {
+			list_for_each_entry_safe(off_entry, off_next,
+				&ipa_ctx->hdr_tbl.head_offset_list[i],
+				link) {
+				/**
+				 * do not remove the default exception
+				 * header which is at offset 0
+				 */
+				if (off_entry->offset == 0)
+					continue;
+				list_del(&off_entry->link);
+				kmem_cache_free(ipa_ctx->hdr_offset_cache,
+					off_entry);
+			}
+			list_for_each_entry_safe(off_entry, off_next,
 				&ipa_ctx->hdr_tbl.head_free_offset_list[i],
 				link) {
-			list_del(&off_entry->link);
-			kmem_cache_free(ipa_ctx->hdr_offset_cache, off_entry);
+				list_del(&off_entry->link);
+				kmem_cache_free(ipa_ctx->hdr_offset_cache,
+					off_entry);
+			}
 		}
+		/* there is one header of size 8 */
+		ipa_ctx->hdr_tbl.end = 8;
+		ipa_ctx->hdr_tbl.hdr_cnt = 1;
 	}
-	/* there is one header of size 8 */
-	ipa_ctx->hdr_tbl.end = 8;
-	ipa_ctx->hdr_tbl.hdr_cnt = 1;
 
 	IPADBG("reset hdr proc ctx\n");
 	list_for_each_entry_safe(
@@ -1291,43 +1351,64 @@ int ipa_reset_hdr(void)
 		link) {
 
 		if (ipa_id_find(ctx_entry->id) == NULL) {
-			WARN_ON(1);
 			mutex_unlock(&ipa_ctx->lock);
+			WARN_ON_RATELIMIT_IPA(1);
 			return -EFAULT;
 		}
-		list_del(&ctx_entry->link);
-		ctx_entry->ref_cnt = 0;
-		ctx_entry->cookie = 0;
 
-		/* remove the handle from the database */
-		ipa_id_remove(ctx_entry->id);
-		kmem_cache_free(ipa_ctx->hdr_proc_ctx_cache, ctx_entry);
+		if (!user_only ||
+				ctx_entry->ipacm_installed) {
+			/* move the offset entry to appropriate free list */
+			list_move(&ctx_entry->offset_entry->link,
+				&htbl_proc->head_free_offset_list[
+					ctx_entry->offset_entry->bin]);
+			list_del(&ctx_entry->link);
+			htbl_proc->proc_ctx_cnt--;
+			ctx_entry->ref_cnt = 0;
+			ctx_entry->cookie = 0;
 
+			/* remove the handle from the database */
+			ipa_id_remove(ctx_entry->id);
+			kmem_cache_free(ipa_ctx->hdr_proc_ctx_cache,
+				ctx_entry);
+		}
 	}
-	for (i = 0; i < IPA_HDR_PROC_CTX_BIN_MAX; i++) {
-		list_for_each_entry_safe(ctx_off_entry, ctx_off_next,
+	/* only clean up offset_list and free_offset_list on global reset */
+	if (!user_only) {
+		for (i = 0; i < IPA_HDR_PROC_CTX_BIN_MAX; i++) {
+			list_for_each_entry_safe(ctx_off_entry, ctx_off_next,
 				&ipa_ctx->hdr_proc_ctx_tbl.head_offset_list[i],
 				link) {
-
-			list_del(&ctx_off_entry->link);
-			kmem_cache_free(ipa_ctx->hdr_proc_ctx_offset_cache,
+				list_del(&ctx_off_entry->link);
+				kmem_cache_free(
+					ipa_ctx->hdr_proc_ctx_offset_cache,
 					ctx_off_entry);
+			}
+			list_for_each_entry_safe(ctx_off_entry, ctx_off_next,
+				&ipa_ctx->hdr_proc_ctx_tbl.
+				head_free_offset_list[i], link) {
+				list_del(&ctx_off_entry->link);
+				kmem_cache_free(
+					ipa_ctx->hdr_proc_ctx_offset_cache,
+					ctx_off_entry);
+			}
 		}
-		list_for_each_entry_safe(ctx_off_entry, ctx_off_next,
-			    &ipa_ctx->hdr_proc_ctx_tbl.head_free_offset_list[i],
-			    link) {
-			list_del(&ctx_off_entry->link);
-			kmem_cache_free(ipa_ctx->hdr_proc_ctx_offset_cache,
-				ctx_off_entry);
-		}
+		ipa_ctx->hdr_proc_ctx_tbl.end = 0;
+		ipa_ctx->hdr_proc_ctx_tbl.proc_ctx_cnt = 0;
 	}
-	ipa_ctx->hdr_proc_ctx_tbl.end = 0;
-	ipa_ctx->hdr_proc_ctx_tbl.proc_ctx_cnt = 0;
-	mutex_unlock(&ipa_ctx->lock);
 
+
+	/* commit the change to IPA-HW */
+	if (ipa_ctx->ctrl->ipa_commit_hdr()) {
+		IPAERR_RL("fail to commit hdr\n");
+		WARN_ON_RATELIMIT_IPA(1);
+		mutex_unlock(&ipa_ctx->lock);
+		return -EFAULT;
+	}
+
+	mutex_unlock(&ipa_ctx->lock);
 	return 0;
 }
-EXPORT_SYMBOL(ipa_reset_hdr);
 
 static struct ipa_hdr_entry *__ipa_find_hdr(const char *name)
 {
@@ -1343,7 +1424,7 @@ static struct ipa_hdr_entry *__ipa_find_hdr(const char *name)
 }
 
 /**
- * ipa_get_hdr() - Lookup the specified header resource
+ * ipa2_get_hdr() - Lookup the specified header resource
  * @lookup:	[inout] header to lookup and its handle
  *
  * lookup the specified header resource and return handle if it exists
@@ -1353,7 +1434,7 @@ static struct ipa_hdr_entry *__ipa_find_hdr(const char *name)
  * Note:	Should not be called from atomic context
  *		Caller should call ipa_put_hdr later if this function succeeds
  */
-int ipa_get_hdr(struct ipa_ioc_get_hdr *lookup)
+int ipa2_get_hdr(struct ipa_ioc_get_hdr *lookup)
 {
 	struct ipa_hdr_entry *entry;
 	int result = -1;
@@ -1377,7 +1458,6 @@ int ipa_get_hdr(struct ipa_ioc_get_hdr *lookup)
 
 	return result;
 }
-EXPORT_SYMBOL(ipa_get_hdr);
 
 /**
  * __ipa_release_hdr() - drop reference to header and cause
@@ -1436,14 +1516,14 @@ bail:
 }
 
 /**
- * ipa_put_hdr() - Release the specified header handle
+ * ipa2_put_hdr() - Release the specified header handle
  * @hdr_hdl:	[in] the header handle to release
  *
  * Returns:	0 on success, negative on failure
  *
  * Note:	Should not be called from atomic context
  */
-int ipa_put_hdr(u32 hdr_hdl)
+int ipa2_put_hdr(u32 hdr_hdl)
 {
 	struct ipa_hdr_entry *entry;
 	int result = -EFAULT;
@@ -1457,8 +1537,8 @@ int ipa_put_hdr(u32 hdr_hdl)
 		goto bail;
 	}
 
-	if (entry == NULL || entry->cookie != IPA_HDR_COOKIE) {
-		IPAERR_RL("bad params\n");
+	if (entry->cookie != IPA_HDR_COOKIE) {
+		IPAERR_RL("invalid header entry\n");
 		result = -EINVAL;
 		goto bail;
 	}
@@ -1468,10 +1548,9 @@ bail:
 	mutex_unlock(&ipa_ctx->lock);
 	return result;
 }
-EXPORT_SYMBOL(ipa_put_hdr);
 
 /**
- * ipa_copy_hdr() - Lookup the specified header resource and return a copy of it
+ * ipa2_copy_hdr() - Lookup the specified header resource and return a copy of it
  * @copy:	[inout] header to lookup and its copy
  *
  * lookup the specified header resource and return a copy of it (along with its
@@ -1481,7 +1560,7 @@ EXPORT_SYMBOL(ipa_put_hdr);
  *
  * Note:	Should not be called from atomic context
  */
-int ipa_copy_hdr(struct ipa_ioc_copy_hdr *copy)
+int ipa2_copy_hdr(struct ipa_ioc_copy_hdr *copy)
 {
 	struct ipa_hdr_entry *entry;
 	int result = -EFAULT;
@@ -1505,4 +1584,3 @@ int ipa_copy_hdr(struct ipa_ioc_copy_hdr *copy)
 
 	return result;
 }
-EXPORT_SYMBOL(ipa_copy_hdr);

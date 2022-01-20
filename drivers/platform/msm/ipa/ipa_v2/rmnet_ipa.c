@@ -25,6 +25,7 @@
 #include <linux/of_device.h>
 #include <linux/string.h>
 #include <linux/skbuff.h>
+#include <linux/version.h>
 #include <linux/workqueue.h>
 #include <net/pkt_sched.h>
 #include <soc/qcom/subsystem_restart.h>
@@ -32,6 +33,9 @@
 #include "ipa_qmi_service.h"
 #include <linux/rmnet_ipa_fd_ioctl.h>
 #include <linux/ipa.h>
+#include <uapi/linux/net_map.h>
+
+#include "ipa_trace.h"
 
 #define WWAN_METADATA_SHFT 24
 #define WWAN_METADATA_MASK 0xFF000000
@@ -41,6 +45,7 @@
 #define TAILROOM            0 /* for padding by mux layer */
 #define MAX_NUM_OF_MUX_CHANNEL  10 /* max mux channels */
 #define UL_FILTER_RULE_HANDLE_START 69
+#define DEFAULT_OUTSTANDING_HIGH_CTL 96
 #define DEFAULT_OUTSTANDING_HIGH 64
 #define DEFAULT_OUTSTANDING_LOW 32
 
@@ -88,6 +93,7 @@ enum wwan_device_status {
 struct ipa_rmnet_plat_drv_res {
 	bool ipa_rmnet_ssr;
 	bool ipa_loaduC;
+	bool ipa_advertise_sg_support;
 };
 
 /**
@@ -107,6 +113,7 @@ struct wwan_private {
 	struct net_device *net;
 	struct net_device_stats stats;
 	atomic_t outstanding_pkts;
+	int outstanding_high_ctl;
 	int outstanding_high;
 	int outstanding_low;
 	uint32_t ch_id;
@@ -146,7 +153,7 @@ static int ipa_setup_a7_qmap_hdr(void)
 				IPA_RESOURCE_NAME_MAX);
 	hdr_entry->hdr_len = IPA_QMAP_HEADER_LENGTH; /* 4 bytes */
 
-	if (ipa_add_hdr(hdr)) {
+	if (ipa2_add_hdr(hdr)) {
 		IPAWANERR("fail to add IPA_A7_QMAP hdr\n");
 		ret = -EPERM;
 		goto bail;
@@ -185,9 +192,9 @@ static void ipa_del_a7_qmap_hdr(void)
 	hdl_entry = &del_hdr->hdl[0];
 	hdl_entry->hdl = qmap_hdr_hdl;
 
-	ret = ipa_del_hdr(del_hdr);
+	ret = ipa2_del_hdr(del_hdr);
 	if (ret || hdl_entry->status)
-		IPAWANERR("ipa_del_hdr failed\n");
+		IPAWANERR("ipa2_del_hdr failed\n");
 	else
 		IPAWANDBG("hdrs deletion done\n");
 
@@ -220,9 +227,9 @@ static void ipa_del_qmap_hdr(uint32_t hdr_hdl)
 	hdl_entry = &del_hdr->hdl[0];
 	hdl_entry->hdl = hdr_hdl;
 
-	ret = ipa_del_hdr(del_hdr);
+	ret = ipa2_del_hdr(del_hdr);
 	if (ret || hdl_entry->status)
-		IPAWANERR("ipa_del_hdr failed\n");
+		IPAWANERR("ipa2_del_hdr failed\n");
 	else
 		IPAWANDBG("header deletion done\n");
 
@@ -270,7 +277,7 @@ static int ipa_add_qmap_hdr(uint32_t mux_id, uint32_t *hdr_hdl)
 	IPAWANDBG("header (%s) with mux-id: (%d)\n",
 		hdr_name,
 		hdr_entry->hdr[1]);
-	if (ipa_add_hdr(hdr)) {
+	if (ipa2_add_hdr(hdr)) {
 		IPAWANERR("fail to add IPA_QMAP hdr\n");
 		ret = -EPERM;
 		goto bail;
@@ -321,7 +328,7 @@ static int ipa_setup_dflt_wan_rt_tables(void)
 	rt_rule_entry->rule.dst = IPA_CLIENT_APPS_WAN_CONS;
 	rt_rule_entry->rule.hdr_hdl = qmap_hdr_hdl;
 
-	if (ipa_add_rt_rule(rt_rule)) {
+	if (ipa2_add_rt_rule(rt_rule)) {
 		IPAWANERR("fail to add dflt_wan v4 rule\n");
 		kfree(rt_rule);
 		return -EPERM;
@@ -332,7 +339,7 @@ static int ipa_setup_dflt_wan_rt_tables(void)
 
 	/* setup a default v6 route to point to A5 */
 	rt_rule->ip = IPA_IP_v6;
-	if (ipa_add_rt_rule(rt_rule)) {
+	if (ipa2_add_rt_rule(rt_rule)) {
 		IPAWANERR("fail to add dflt_wan v6 rule\n");
 		kfree(rt_rule);
 		return -EPERM;
@@ -369,7 +376,7 @@ static void ipa_del_dflt_wan_rt_tables(void)
 
 	IPAWANERR("Deleting Route hdl:(0x%x) with ip type: %d\n",
 		rt_rule_entry->hdl, IPA_IP_v4);
-	if (ipa_del_rt_rule(rt_rule) ||
+	if (ipa2_del_rt_rule(rt_rule) ||
 			(rt_rule_entry->status)) {
 		IPAWANERR("Routing rule deletion failed!\n");
 	}
@@ -378,7 +385,7 @@ static void ipa_del_dflt_wan_rt_tables(void)
 	rt_rule_entry->hdl = dflt_v6_wan_rt_hdl;
 	IPAWANERR("Deleting Route hdl:(0x%x) with ip type: %d\n",
 		rt_rule_entry->hdl, IPA_IP_v6);
-	if (ipa_del_rt_rule(rt_rule) ||
+	if (ipa2_del_rt_rule(rt_rule) ||
 			(rt_rule_entry->status)) {
 		IPAWANERR("Routing rule deletion failed!\n");
 	}
@@ -608,7 +615,12 @@ static int wwan_add_ul_flt_rule_to_ipa(void)
 	int num_v4_rule = 0, num_v6_rule = 0;
 	struct ipa_ioc_add_flt_rule *param;
 	struct ipa_flt_rule_add flt_rule_entry;
-	struct ipa_fltr_installed_notif_req_msg_v01 req;
+	struct ipa_fltr_installed_notif_req_msg_v01 *req;
+
+	if (ipa_qmi_ctx == NULL) {
+		IPAWANERR("ipa_qmi_ctx is NULL!\n");
+		return -EFAULT;
+	}
 
 	pyld_sz = sizeof(struct ipa_ioc_add_flt_rule) +
 	   sizeof(struct ipa_flt_rule_add);
@@ -616,13 +628,23 @@ static int wwan_add_ul_flt_rule_to_ipa(void)
 	if (!param)
 		return -ENOMEM;
 
+	req = (struct ipa_fltr_installed_notif_req_msg_v01 *)
+		kzalloc(sizeof(struct ipa_fltr_installed_notif_req_msg_v01),
+			GFP_KERNEL);
+	if (!req) {
+		kfree(param);
+		return -ENOMEM;
+	}
+
+	memset(req, 0, sizeof(struct ipa_fltr_installed_notif_req_msg_v01));
+
 	param->commit = 1;
 	param->ep = IPA_CLIENT_APPS_LAN_WAN_PROD;
 	param->global = false;
 	param->num_rules = (uint8_t)1;
 
 	mutex_lock(&ipa_qmi_lock);
-	for (i = 0; i < num_q6_rule && (ipa_qmi_ctx != NULL); i++) {
+	for (i = 0; i < num_q6_rule; i++) {
 		param->ip = ipa_qmi_ctx->q6_ul_filter_rule[i].ip;
 		memset(&flt_rule_entry, 0, sizeof(struct ipa_flt_rule_add));
 		flt_rule_entry.at_rear = true;
@@ -641,7 +663,7 @@ static int wwan_add_ul_flt_rule_to_ipa(void)
 			sizeof(struct ipa_ipfltri_rule_eq));
 		memcpy(&(param->rules[0]), &flt_rule_entry,
 			sizeof(struct ipa_flt_rule_add));
-		if (ipa_add_flt_rule((struct ipa_ioc_add_flt_rule *)param)) {
+		if (ipa2_add_flt_rule((struct ipa_ioc_add_flt_rule *)param)) {
 			retval = -EFAULT;
 			IPAWANERR("add A7 UL filter rule(%d) failed\n", i);
 		} else {
@@ -653,25 +675,24 @@ static int wwan_add_ul_flt_rule_to_ipa(void)
 	mutex_unlock(&ipa_qmi_lock);
 
 	/* send ipa_fltr_installed_notif_req_msg_v01 to Q6*/
-	memset(&req, 0, sizeof(struct ipa_fltr_installed_notif_req_msg_v01));
-	req.source_pipe_index =
-		ipa_get_ep_mapping(IPA_CLIENT_APPS_LAN_WAN_PROD);
-	req.install_status = QMI_RESULT_SUCCESS_V01;
-	req.filter_index_list_len = num_q6_rule;
+	req->source_pipe_index =
+		ipa2_get_ep_mapping(IPA_CLIENT_APPS_LAN_WAN_PROD);
+	req->install_status = IPA_QMI_RESULT_SUCCESS_V01;
+	req->filter_index_list_len = num_q6_rule;
 	mutex_lock(&ipa_qmi_lock);
-	for (i = 0; i < num_q6_rule && (ipa_qmi_ctx != NULL); i++) {
+	for (i = 0; i < num_q6_rule; i++) {
 		if (ipa_qmi_ctx->q6_ul_filter_rule[i].ip == IPA_IP_v4) {
-			req.filter_index_list[i].filter_index = num_v4_rule;
+			req->filter_index_list[i].filter_index = num_v4_rule;
 			num_v4_rule++;
 		} else {
-			req.filter_index_list[i].filter_index = num_v6_rule;
+			req->filter_index_list[i].filter_index = num_v6_rule;
 			num_v6_rule++;
 		}
-		req.filter_index_list[i].filter_handle =
+		req->filter_index_list[i].filter_handle =
 			ipa_qmi_ctx->q6_ul_filter_rule[i].filter_hdl;
 	}
 	mutex_unlock(&ipa_qmi_lock);
-	if (qmi_filter_notify_send(&req)) {
+	if (qmi_filter_notify_send(req)) {
 		IPAWANDBG("add filter rule index on A7-RX failed\n");
 		retval = -EFAULT;
 	}
@@ -679,6 +700,7 @@ static int wwan_add_ul_flt_rule_to_ipa(void)
 	IPAWANDBG("add (%d) filter rule index on A7-RX\n",
 			old_num_q6_rule);
 	kfree(param);
+	kfree(req);
 	return retval;
 }
 
@@ -708,7 +730,7 @@ static int wwan_del_ul_flt_rule_to_ipa(void)
 		IPAWANDBG("delete-IPA rule index(%d)\n", i);
 		memcpy(&(param->hdl[0]), &flt_rule_entry,
 			sizeof(struct ipa_flt_rule_del));
-		if (ipa_del_flt_rule((struct ipa_ioc_del_flt_rule *)param)) {
+		if (ipa2_del_flt_rule((struct ipa_ioc_del_flt_rule *)param)) {
 			IPAWANERR("del A7 UL filter rule(%d) failed\n", i);
 			kfree(param);
 			return -EFAULT;
@@ -828,11 +850,11 @@ static int wwan_register_to_ipa(int index)
 		ext_properties.prop[i].action,
 		ext_properties.prop[i].mux_id);
 	}
-	ret = ipa_register_intf_ext(mux_channel[index].
+	ret = ipa2_register_intf_ext(mux_channel[index].
 		vchannel_name, &tx_properties,
 		&rx_properties, &ext_properties);
 	if (ret) {
-		IPAWANERR("[%s]:ipa_register_intf failed %d\n",
+		IPAWANERR("[%s]:ipa2_register_intf failed %d\n",
 			mux_channel[index].vchannel_name, ret);
 		goto fail;
 	}
@@ -849,7 +871,8 @@ static void ipa_cleanup_deregister_intf(void)
 
 	for (i = 0; i < rmnet_index; i++) {
 		if (mux_channel[i].ul_flt_reg) {
-			ret = ipa_deregister_intf(mux_channel[i].vchannel_name);
+			ret = ipa2_deregister_intf(
+				mux_channel[i].vchannel_name);
 			if (ret < 0) {
 				IPAWANERR("de-register device %s(%d) failed\n",
 					mux_channel[i].vchannel_name,
@@ -914,13 +937,17 @@ int wwan_update_mux_channel_prop(void)
 	return ret;
 }
 
+#ifdef INIT_COMPLETION
+#define reinit_completion(x) INIT_COMPLETION(*(x))
+#endif /* INIT_COMPLETION */
+
 static int __ipa_wwan_open(struct net_device *dev)
 {
 	struct wwan_private *wwan_ptr = netdev_priv(dev);
 
 	IPAWANDBG("[%s] __wwan_open()\n", dev->name);
 	if (wwan_ptr->device_status != WWAN_DEVICE_ACTIVE)
-		INIT_COMPLETION(wwan_ptr->resource_granted_completion);
+		reinit_completion(&wwan_ptr->resource_granted_completion);
 	wwan_ptr->device_status = WWAN_DEVICE_ACTIVE;
 	return 0;
 }
@@ -955,10 +982,10 @@ static int __ipa_wwan_close(struct net_device *dev)
 		wwan_ptr->device_status = WWAN_DEVICE_INACTIVE;
 		/* do not close wwan port once up,  this causes
 			remote side to hang if tried to open again */
-		INIT_COMPLETION(wwan_ptr->resource_granted_completion);
-		rc = ipa_deregister_intf(dev->name);
+		reinit_completion(&wwan_ptr->resource_granted_completion);
+		rc = ipa2_deregister_intf(dev->name);
 		if (rc) {
-			IPAWANERR("[%s]: ipa_deregister_intf failed %d\n",
+			IPAWANERR("[%s]: ipa2_deregister_intf failed %d\n",
 			       dev->name, rc);
 			return rc;
 		}
@@ -1012,12 +1039,48 @@ static int ipa_wwan_change_mtu(struct net_device *dev, int new_mtu)
 static int ipa_wwan_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	int ret = 0;
+	bool qmap_check;
 	struct wwan_private *wwan_ptr = netdev_priv(dev);
+	struct ipa_tx_meta meta;
 
-	if (netif_queue_stopped(dev)) {
-		IPAWANERR("[%s]fatal: ipa_wwan_xmit stopped\n", dev->name);
-	return 0;
+	if (skb->protocol != htons(ETH_P_MAP)) {
+		IPAWANDBG_LOW
+		("SW filtering out none QMAP packet received from %s",
+		current->comm);
+		dev_kfree_skb_any(skb);
+		dev->stats.tx_dropped++;
+		return NETDEV_TX_OK;
 	}
+
+	qmap_check = RMNET_MAP_GET_CD_BIT(skb);
+	if (netif_queue_stopped(dev)) {
+		if (qmap_check &&
+			atomic_read(&wwan_ptr->outstanding_pkts) <
+					wwan_ptr->outstanding_high_ctl) {
+			pr_err("[%s]Queue stop, send ctrl pkts\n", dev->name);
+			goto send;
+		} else {
+			pr_err("[%s]fatal: ipa_wwan_xmit stopped\n", dev->name);
+			return NETDEV_TX_BUSY;
+		}
+	}
+
+	/* checking High WM hit */
+	if (atomic_read(&wwan_ptr->outstanding_pkts) >=
+					wwan_ptr->outstanding_high) {
+		if (!qmap_check) {
+			IPAWANDBG_LOW
+				("pending(%d)/(%d)- stop(%d), qmap_chk(%d)\n",
+				atomic_read(&wwan_ptr->outstanding_pkts),
+				wwan_ptr->outstanding_high,
+				netif_queue_stopped(dev),
+				qmap_check);
+			netif_stop_queue(dev);
+			return NETDEV_TX_BUSY;
+		}
+	}
+
+send:
 	/* IPA_RM checking start */
 	ret = ipa_rm_inactivity_timer_request_resource(
 		IPA_RM_RESOURCE_WWAN_0_PROD);
@@ -1028,30 +1091,23 @@ static int ipa_wwan_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (ret) {
 		pr_err("[%s] fatal: ipa rm timer request resource failed %d\n",
 		       dev->name, ret);
+		dev_kfree_skb_any(skb);
+		dev->stats.tx_dropped++;
 		return -EFAULT;
 	}
 	/* IPA_RM checking end */
-	if (skb->protocol != htons(ETH_P_MAP)) {
-		IPAWANDBG
-		("SW filtering out none QMAP packet received from %s",
-		current->comm);
-		ret = NETDEV_TX_OK;
-		goto out;
+
+	if (qmap_check) {
+		memset(&meta, 0, sizeof(meta));
+		meta.pkt_init_dst_ep_valid = true;
+		meta.pkt_init_dst_ep_remote = true;
+		ret = ipa2_tx_dp(IPA_CLIENT_Q6_LAN_CONS, skb, &meta);
+	} else {
+		ret = ipa2_tx_dp(IPA_CLIENT_APPS_LAN_WAN_PROD, skb, NULL);
 	}
 
-	/* checking High WM hit */
-	if (atomic_read(&wwan_ptr->outstanding_pkts) >=
-					wwan_ptr->outstanding_high) {
-		IPAWANDBG("Outstanding high (%d)- stopping\n",
-				wwan_ptr->outstanding_high);
-		netif_stop_queue(dev);
-		ret = NETDEV_TX_BUSY;
-		goto out;
-	}
-	ret = ipa_tx_dp(IPA_CLIENT_APPS_LAN_WAN_PROD, skb, NULL);
 	if (ret) {
 		ret = NETDEV_TX_BUSY;
-		dev->stats.tx_dropped++;
 		goto out;
 	}
 
@@ -1059,7 +1115,6 @@ static int ipa_wwan_xmit(struct sk_buff *skb, struct net_device *dev)
 	dev->stats.tx_packets++;
 	dev->stats.tx_bytes += skb->len;
 	ret = NETDEV_TX_OK;
-
 out:
 	if (atomic_read(&wwan_ptr->outstanding_pkts) == 0)
 		ipa_rm_inactivity_timer_release_resource(
@@ -1090,14 +1145,16 @@ static void apps_ipa_tx_complete_notify(void *priv,
 	struct net_device *dev = (struct net_device *)priv;
 	struct wwan_private *wwan_ptr;
 
-	if (evt != IPA_WRITE_DONE) {
-		IPAWANDBG("unsupported event on Tx callback\n");
-		return;
-	}
-
 	if (dev != ipa_netdevs[0]) {
 		IPAWANDBG("Received pre-SSR packet completion\n");
 		dev_kfree_skb_any(skb);
+		return;
+	}
+
+	if (evt != IPA_WRITE_DONE) {
+		IPAWANERR("unsupported evt on Tx callback, Drop the packet\n");
+		dev_kfree_skb_any(skb);
+		dev->stats.tx_dropped++;
 		return;
 	}
 
@@ -1108,7 +1165,8 @@ static void apps_ipa_tx_complete_notify(void *priv,
 		netif_queue_stopped(wwan_ptr->net) &&
 		atomic_read(&wwan_ptr->outstanding_pkts) <
 					(wwan_ptr->outstanding_low)) {
-		IPAWANDBG("Outstanding low (%d) - waking up queue\n",
+		IPAWANDBG_LOW
+			("Outstanding low (%d) - wake up queue\n",
 				wwan_ptr->outstanding_low);
 		netif_wake_queue(wwan_ptr->net);
 	}
@@ -1138,7 +1196,7 @@ static void apps_ipa_packet_receive_notify(void *priv,
 	int result;
 	unsigned int packet_len = skb->len;
 
-	IPAWANDBG("Rx packet was received");
+	IPAWANDBG_LOW("Rx packet was received");
 	if (evt != IPA_RECEIVE) {
 		IPAWANERR("A none IPA_RECEIVE event in wan_ipa_receive\n");
 		return;
@@ -1147,19 +1205,24 @@ static void apps_ipa_packet_receive_notify(void *priv,
 	skb->dev = ipa_netdevs[0];
 	skb->protocol = htons(ETH_P_MAP);
 
-	if (dev->stats.rx_packets % IPA_WWAN_RX_SOFTIRQ_THRESH == 0)
+	if (dev->stats.rx_packets % IPA_WWAN_RX_SOFTIRQ_THRESH == 0) {
+		trace_rmnet_ipa_netifni(dev->stats.rx_packets);
 		result = netif_rx_ni(skb);
-	else
+	} else {
+		trace_rmnet_ipa_netifrx(dev->stats.rx_packets);
 		result = netif_rx(skb);
+	}
 
 	if (result)	{
-		pr_err_ratelimited(DEV_NAME " %s:%d fail on netif_rx_ni\n",
+		pr_err_ratelimited(DEV_NAME " %s:%d fail on netif_rx\n",
 				__func__, __LINE__);
 		dev->stats.rx_dropped++;
 	}
 	dev->stats.rx_packets++;
 	dev->stats.rx_bytes += packet_len;
 }
+
+static struct ipa_rmnet_plat_drv_res ipa_rmnet_res = {0, };
 
 /**
  * ipa_wwan_ioctl() - I/O control for wwan network driver.
@@ -1291,6 +1354,15 @@ static int ipa_wwan_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 				sizeof(struct rmnet_ioctl_extended_s)))
 				rc = -EFAULT;
 			break;
+		/* GET SG support */
+		case RMNET_IOCTL_GET_SG_SUPPORT:
+			extend_ioctl_data.u.data =
+				ipa_rmnet_res.ipa_advertise_sg_support;
+			if (copy_to_user((u8 *)ifr->ifr_ifru.ifru_data,
+				&extend_ioctl_data,
+				sizeof(struct rmnet_ioctl_extended_s)))
+				rc = -EFAULT;
+			break;
 		/*  Get endpoint ID  */
 		case RMNET_IOCTL_GET_EPID:
 			IPAWANDBG("get ioctl: RMNET_IOCTL_GET_EPID\n");
@@ -1313,9 +1385,9 @@ static int ipa_wwan_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		case RMNET_IOCTL_GET_EP_PAIR:
 			IPAWANDBG("get ioctl: RMNET_IOCTL_GET_EP_PAIR\n");
 			extend_ioctl_data.u.ipa_ep_pair.consumer_pipe_num =
-			ipa_get_ep_mapping(IPA_CLIENT_APPS_LAN_WAN_PROD);
+			ipa2_get_ep_mapping(IPA_CLIENT_APPS_LAN_WAN_PROD);
 			extend_ioctl_data.u.ipa_ep_pair.producer_pipe_num =
-			ipa_get_ep_mapping(IPA_CLIENT_APPS_WAN_CONS);
+			ipa2_get_ep_mapping(IPA_CLIENT_APPS_WAN_CONS);
 			if (copy_to_user((u8 *)ifr->ifr_ifru.ifru_data,
 				&extend_ioctl_data,
 				sizeof(struct rmnet_ioctl_extended_s)))
@@ -1334,8 +1406,8 @@ static int ipa_wwan_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		/*  Get driver name  */
 		case RMNET_IOCTL_GET_DRIVER_NAME:
 			memcpy(&extend_ioctl_data.u.if_name,
-						ipa_netdevs[0]->name,
-							sizeof(IFNAMSIZ));
+						ipa_netdevs[0]->name, IFNAMSIZ);
+			extend_ioctl_data.u.if_name[IFNAMSIZ - 1] = '\0';
 			if (copy_to_user((u8 *)ifr->ifr_ifru.ifru_data,
 					&extend_ioctl_data,
 					sizeof(struct rmnet_ioctl_extended_s)))
@@ -1371,6 +1443,7 @@ static int ipa_wwan_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 				sizeof(mux_channel[rmnet_index].vchannel_name));
 			mux_channel[rmnet_index].vchannel_name[
 				IFNAMSIZ - 1] = '\0';
+
 			IPAWANDBG("cashe device[%s:%d] in IPA_wan[%d]\n",
 				mux_channel[rmnet_index].vchannel_name,
 				mux_channel[rmnet_index].mux_id,
@@ -1406,7 +1479,8 @@ static int ipa_wwan_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 					RMNET_IOCTL_EGRESS_FORMAT_CHECKSUM) {
 				apps_to_ipa_ep_cfg.ipa_ep_cfg.hdr.hdr_len = 8;
 				apps_to_ipa_ep_cfg.ipa_ep_cfg.cfg.
-					cs_offload_en = 1;
+					cs_offload_en =
+					IPA_ENABLE_CS_OFFLOAD_UL;
 				apps_to_ipa_ep_cfg.ipa_ep_cfg.cfg.
 					cs_metadata_hdr_offset = 1;
 			} else {
@@ -1435,22 +1509,22 @@ static int ipa_wwan_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 			IPA_SYS_TX_DATA_DESC_FIFO_SZ;
 			apps_to_ipa_ep_cfg.priv = dev;
 
-			rc = ipa_setup_sys_pipe(&apps_to_ipa_ep_cfg,
+			rc = ipa2_setup_sys_pipe(&apps_to_ipa_ep_cfg,
 				&apps_to_ipa_hdl);
 			if (rc)
 				IPAWANERR("failed to config egress endpoint\n");
 
 			if (num_q6_rule != 0) {
-				/* protect num_q6_rule */
-				mutex_lock(&add_mux_channel_lock);
 				/* already got Q6 UL filter rules*/
 				if (ipa_qmi_ctx &&
 					ipa_qmi_ctx->modem_cfg_emb_pipe_flt
-					== false)
+					== false) {
+					/* protect num_q6_rule */
+					mutex_lock(&add_mux_channel_lock);
 					rc = wwan_add_ul_flt_rule_to_ipa();
-				else
+					mutex_unlock(&add_mux_channel_lock);
+				} else
 					rc = 0;
-				mutex_unlock(&add_mux_channel_lock);
 				egress_set = true;
 				if (rc)
 					IPAWANERR("install UL rules failed\n");
@@ -1468,7 +1542,8 @@ static int ipa_wwan_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 			if ((extend_ioctl_data.u.data) &
 					RMNET_IOCTL_INGRESS_FORMAT_CHECKSUM)
 				ipa_to_apps_ep_cfg.ipa_ep_cfg.cfg.
-					cs_offload_en = 2;
+					cs_offload_en =
+					IPA_ENABLE_CS_OFFLOAD_DL;
 
 			if ((extend_ioctl_data.u.data) &
 					RMNET_IOCTL_INGRESS_FORMAT_AGG_DATA) {
@@ -1527,7 +1602,7 @@ static int ipa_wwan_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 				rc = -EFAULT;
 				break;
 			}
-			rc = ipa_setup_sys_pipe(
+			rc = ipa2_setup_sys_pipe(
 				&ipa_to_apps_ep_cfg, &ipa_to_apps_hdl);
 			mutex_unlock(&ipa_to_apps_pipe_handle_guard);
 			if (rc)
@@ -1547,10 +1622,11 @@ static int ipa_wwan_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 				sizeof(wan_msg->upstream_ifname);
 			strlcpy(wan_msg->upstream_ifname,
 				extend_ioctl_data.u.if_name, len);
+			wan_msg->upstream_ifname[len - 1] = '\0';
 			memset(&msg_meta, 0, sizeof(struct ipa_msg_meta));
 			msg_meta.msg_type = WAN_XLAT_CONNECT;
 			msg_meta.msg_len = sizeof(struct ipa_wan_msg);
-			rc = ipa_send_msg(&msg_meta, wan_msg,
+			rc = ipa2_send_msg(&msg_meta, wan_msg,
 						ipa_wwan_msg_free_cb);
 			if (rc) {
 				IPAWANERR("Failed to send XLAT_CONNECT msg\n");
@@ -1684,10 +1760,10 @@ static void q6_rm_notify_cb(void *user_data,
 {
 	switch (event) {
 	case IPA_RM_RESOURCE_GRANTED:
-		IPAWANDBG("%s: Q6_PROD GRANTED CB\n", __func__);
+		IPAWANDBG_LOW("%s: Q6_PROD GRANTED CB\n", __func__);
 		break;
 	case IPA_RM_RESOURCE_RELEASED:
-		IPAWANDBG("%s: Q6_PROD RELEASED CB\n", __func__);
+		IPAWANDBG_LOW("%s: Q6_PROD RELEASED CB\n", __func__);
 		break;
 	default:
 		return;
@@ -1771,7 +1847,9 @@ void q6_deinitialize_rm(void)
 	if (ret < 0)
 		IPAWANERR("Error deleting resource %d, ret=%d\n",
 			IPA_RM_RESOURCE_Q6_PROD, ret);
-	destroy_workqueue(ipa_rm_q6_workqueue);
+
+	if (ipa_rm_q6_workqueue)
+		destroy_workqueue(ipa_rm_q6_workqueue);
 }
 
 static void wake_tx_queue(struct work_struct *work)
@@ -1794,7 +1872,7 @@ static void wake_tx_queue(struct work_struct *work)
  */
 static void ipa_rm_resource_granted(void *dev)
 {
-	IPAWANDBG("Resource Granted - starting queue\n");
+	IPAWANDBG_LOW("Resource Granted - starting queue\n");
 	schedule_work(&ipa_tx_wakequeue_work);
 }
 
@@ -1843,8 +1921,6 @@ static struct notifier_block ssr_notifier = {
 	.notifier_call = ssr_notifier_cb,
 };
 
-static struct ipa_rmnet_plat_drv_res ipa_rmnet_res = {0, };
-
 static int get_ipa_rmnet_dts_configuration(struct platform_device *pdev,
 		struct ipa_rmnet_plat_drv_res *ipa_rmnet_drv_res)
 {
@@ -1858,6 +1934,12 @@ static int get_ipa_rmnet_dts_configuration(struct platform_device *pdev,
 			"qcom,ipa-loaduC");
 	pr_info("IPA ipa-loaduC = %s\n",
 		ipa_rmnet_drv_res->ipa_loaduC ? "True" : "False");
+
+	ipa_rmnet_drv_res->ipa_advertise_sg_support =
+			of_property_read_bool(pdev->dev.of_node,
+			"qcom,ipa-advertise-sg-support");
+	pr_info("IPA SG support = %s\n",
+		ipa_rmnet_drv_res->ipa_advertise_sg_support ? "True" : "False");
 	return 0;
 }
 
@@ -1883,7 +1965,7 @@ static int ipa_wwan_probe(struct platform_device *pdev)
 
 	pr_info("rmnet_ipa started initialization\n");
 
-	if (!ipa_is_ready()) {
+	if (!ipa2_is_ready()) {
 		IPAWANERR("IPA driver not loaded\n");
 		return -ENODEV;
 	}
@@ -1938,7 +2020,8 @@ static int ipa_wwan_probe(struct platform_device *pdev)
 
 	/* initialize wan-driver netdev */
 	dev = alloc_netdev(sizeof(struct wwan_private),
-			   IPA_WWAN_DEV_NAME, ipa_wwan_setup);
+			   IPA_WWAN_DEV_NAME,
+			   ipa_wwan_setup);
 	if (!dev) {
 		IPAWANERR("no memory for netdev\n");
 		ret = -ENOMEM;
@@ -1949,6 +2032,7 @@ static int ipa_wwan_probe(struct platform_device *pdev)
 	memset(wwan_ptr, 0, sizeof(*wwan_ptr));
 	IPAWANDBG("wwan_ptr (private) = %p", wwan_ptr);
 	wwan_ptr->net = dev;
+	wwan_ptr->outstanding_high_ctl = DEFAULT_OUTSTANDING_HIGH_CTL;
 	wwan_ptr->outstanding_high = DEFAULT_OUTSTANDING_HIGH;
 	wwan_ptr->outstanding_low = DEFAULT_OUTSTANDING_LOW;
 	atomic_set(&wwan_ptr->outstanding_pkts, 0);
@@ -1996,6 +2080,10 @@ static int ipa_wwan_probe(struct platform_device *pdev)
 		goto set_perf_err;
 	/* IPA_RM configuration ends */
 
+	/* Enable SG support in netdevice. */
+	if (ipa_rmnet_res.ipa_advertise_sg_support)
+		dev->hw_features |= NETIF_F_SG;
+
 	ret = register_netdev(dev);
 	if (ret) {
 		IPAWANERR("unable to register ipa_netdev %d rc=%d\n",
@@ -2013,7 +2101,7 @@ static int ipa_wwan_probe(struct platform_device *pdev)
 	atomic_set(&is_initialized, 1);
 	if (!atomic_read(&is_ssr)) {
 		/* offline charging mode */
-		ipa_proxy_clk_unvote();
+		ipa2_proxy_clk_unvote();
 	}
 	atomic_set(&is_ssr, 0);
 
@@ -2040,7 +2128,10 @@ timer_init_err:
 		IPAWANERR("Error deleting resource %d, ret=%d\n",
 		IPA_RM_RESOURCE_WWAN_0_PROD, ret);
 create_rsrc_err:
-	q6_deinitialize_rm();
+
+	if (!atomic_read(&is_ssr))
+		q6_deinitialize_rm();
+
 q6_init_err:
 	free_netdev(ipa_netdevs[0]);
 	ipa_netdevs[0] = NULL;
@@ -2062,7 +2153,7 @@ static int ipa_wwan_remove(struct platform_device *pdev)
 
 	pr_info("rmnet_ipa started deinitialization\n");
 	mutex_lock(&ipa_to_apps_pipe_handle_guard);
-	ret = ipa_teardown_sys_pipe(ipa_to_apps_hdl);
+	ret = ipa2_teardown_sys_pipe(ipa_to_apps_hdl);
 	if (ret < 0)
 		IPAWANERR("Failed to teardown IPA->APPS pipe\n");
 	else
@@ -2122,7 +2213,7 @@ static int rmnet_ipa_ap_suspend(struct device *dev)
 	struct net_device *netdev = ipa_netdevs[0];
 	struct wwan_private *wwan_ptr = netdev_priv(netdev);
 
-	IPAWANDBG("Enter...\n");
+	IPAWANDBG_LOW("Enter...\n");
 	/* Do not allow A7 to suspend in case there are oustanding packets */
 	if (atomic_read(&wwan_ptr->outstanding_pkts) != 0) {
 		IPAWANDBG("Outstanding packets, postponing AP suspend.\n");
@@ -2131,10 +2222,9 @@ static int rmnet_ipa_ap_suspend(struct device *dev)
 
 	/* Make sure that there is no Tx operation ongoing */
 	netif_tx_lock_bh(netdev);
-	netif_device_detach(netdev);
 	ipa_rm_release_resource(IPA_RM_RESOURCE_WWAN_0_PROD);
 	netif_tx_unlock_bh(netdev);
-	IPAWANDBG("Exit\n");
+	IPAWANDBG_LOW("Exit\n");
 
 	return 0;
 }
@@ -2153,10 +2243,9 @@ static int rmnet_ipa_ap_resume(struct device *dev)
 {
 	struct net_device *netdev = ipa_netdevs[0];
 
-	IPAWANDBG("Enter...\n");
+	IPAWANDBG_LOW("Enter...\n");
 	netif_wake_queue(netdev);
-	netif_device_attach(netdev);
-	IPAWANDBG("Exit\n");
+	IPAWANDBG_LOW("Exit\n");
 
 	return 0;
 }
@@ -2253,23 +2342,22 @@ static int ssr_notifier_cb(struct notifier_block *this,
 			if (atomic_read(&is_ssr))
 				/* clean up cached QMI msg/handlers */
 				ipa_qmi_service_exit();
-			ipa_proxy_clk_vote();
+			ipa2_proxy_clk_vote();
 			pr_info("IPA BEFORE_POWERUP handling is complete\n");
 			return NOTIFY_DONE;
 		}
 	}
+	IPAWANDBG_LOW("Exit\n");
 	return NOTIFY_DONE;
 }
 
-
-
 /**
- * rmnet_ipa_free_msg() - Free the msg sent to user space via ipa_send_msg
+ * rmnet_ipa_free_msg() - Free the msg sent to user space via ipa2_send_msg
  * @buff: pointer to buffer containing the message
  * @len: message len
  * @type: message type
  *
- * This function is invoked when ipa_send_msg is complete (Provided as a
+ * This function is invoked when ipa2_send_msg is complete (Provided as a
  * free function pointer along with the message).
  */
 static void rmnet_ipa_free_msg(void *buff, u32 len, u32 type)
@@ -2318,18 +2406,20 @@ static void rmnet_ipa_get_stats_and_update(bool reset)
 	}
 
 	rc = ipa_qmi_get_data_stats(&req, resp);
+	if (rc) {
+		IPAWANERR("ipa_qmi_get_data_stats failed: %d\n", rc);
+		kfree(resp);
+		return;
+	}
 
-	if (!rc) {
-		memset(&msg_meta, 0, sizeof(struct ipa_msg_meta));
-		msg_meta.msg_type = IPA_TETHERING_STATS_UPDATE_STATS;
-		msg_meta.msg_len =
-			sizeof(struct ipa_get_data_stats_resp_msg_v01);
-		rc = ipa_send_msg(&msg_meta, resp, rmnet_ipa_free_msg);
-		if (rc) {
-			IPAWANERR("ipa_send_msg failed: %d\n", rc);
-			kfree(resp);
-			return;
-		}
+	memset(&msg_meta, 0, sizeof(struct ipa_msg_meta));
+	msg_meta.msg_type = IPA_TETHERING_STATS_UPDATE_STATS;
+	msg_meta.msg_len = sizeof(struct ipa_get_data_stats_resp_msg_v01);
+	rc = ipa2_send_msg(&msg_meta, resp, rmnet_ipa_free_msg);
+	if (rc) {
+		IPAWANERR("ipa2_send_msg failed: %d\n", rc);
+		kfree(resp);
+		return;
 	}
 }
 
@@ -2378,18 +2468,20 @@ static void rmnet_ipa_get_network_stats_and_update(void)
 	req.mux_id_list[0] = ipa_rmnet_ctx.metered_mux_id;
 
 	rc = ipa_qmi_get_network_stats(&req, resp);
+	if (rc) {
+		IPAWANERR("ipa_qmi_get_network_stats failed %d\n", rc);
+		kfree(resp);
+		return;
+	}
 
-	if (!rc) {
-		memset(&msg_meta, 0, sizeof(struct ipa_msg_meta));
-		msg_meta.msg_type = IPA_TETHERING_STATS_UPDATE_NETWORK_STATS;
-		msg_meta.msg_len =
-			sizeof(struct ipa_get_apn_data_stats_resp_msg_v01);
-		rc = ipa_send_msg(&msg_meta, resp, rmnet_ipa_free_msg);
-		if (rc) {
-			IPAWANERR("ipa_send_msg failed: %d\n", rc);
-			kfree(resp);
-			return;
-		}
+	memset(&msg_meta, 0, sizeof(struct ipa_msg_meta));
+	msg_meta.msg_type = IPA_TETHERING_STATS_UPDATE_NETWORK_STATS;
+	msg_meta.msg_len = sizeof(struct ipa_get_apn_data_stats_resp_msg_v01);
+	rc = ipa2_send_msg(&msg_meta, resp, rmnet_ipa_free_msg);
+	if (rc) {
+		IPAWANERR("ipa2_send_msg failed: %d\n", rc);
+		kfree(resp);
+		return;
 	}
 }
 
@@ -2412,8 +2504,6 @@ static void rmnet_ipa_send_quota_reach_ind(void)
 		return;
 	}
 }
-
-
 /**
  * rmnet_ipa_poll_tethering_stats() - Tethering stats polling IOCTL handler
  * @data - IOCTL data
@@ -2448,7 +2538,7 @@ int rmnet_ipa_poll_tethering_stats(struct wan_ioctl_poll_tethering_stats *data)
  * @data - IOCTL data
  *
  * This function handles WAN_IOC_SET_DATA_QUOTA.
- * It translates the given inteface name to the Modem MUX ID and
+ * It translates the given interface name to the Modem MUX ID and
  * sends the request of the quota to the IPA Modem driver via QMI.
  *
  * Return codes:
@@ -2560,18 +2650,28 @@ int rmnet_ipa_query_tethering_stats(struct wan_ioctl_query_tether_stats *data,
 	struct ipa_get_data_stats_resp_msg_v01 *resp;
 	int pipe_len, rc;
 
+	if (data != NULL) {
+		/* prevent string buffer overflows */
+		data->upstreamIface[IFNAMSIZ-1] = '\0';
+		data->tetherIface[IFNAMSIZ-1] = '\0';
+	} else if (reset == false) {
+		/* only reset can have data == NULL*/
+		IPAWANERR("query without allocate tether_stats strucutre\n");
+		return -EINVAL;
+	}
+
 	req = kzalloc(sizeof(struct ipa_get_data_stats_req_msg_v01),
 			GFP_KERNEL);
 	if (!req) {
-		IPAWANERR("Can't allocate memory for stats message\n");
-		return rc;
+		IPAWANERR("failed to allocate memory for stats message\n");
+		return -ENOMEM;
 	}
 	resp = kzalloc(sizeof(struct ipa_get_data_stats_resp_msg_v01),
 			GFP_KERNEL);
 	if (!resp) {
-		IPAWANERR("Can't allocate memory for stats message\n");
+		IPAWANERR("failed to allocate memory for stats message\n");
 		kfree(req);
-		return rc;
+		return -ENOMEM;
 	}
 	memset(req, 0, sizeof(struct ipa_get_data_stats_req_msg_v01));
 	memset(resp, 0, sizeof(struct ipa_get_data_stats_resp_msg_v01));
@@ -2580,10 +2680,13 @@ int rmnet_ipa_query_tethering_stats(struct wan_ioctl_query_tether_stats *data,
 	if (reset) {
 		req->reset_stats_valid = true;
 		req->reset_stats = true;
-		IPAWANERR("reset the pipe stats\n");
+		IPAWANDBG("reset the pipe stats\n");
 	} else {
 		/* print tethered-client enum */
-		IPAWANDBG("Tethered-client enum(%d)\n", data->ipa_client);
+		if (data == NULL)
+			return -EINVAL;
+		IPAWANDBG_LOW("Tethered-client enum(%d)\n",
+				data->ipa_client);
 	}
 
 	rc = ipa_qmi_get_data_stats(req, resp);
@@ -2601,10 +2704,11 @@ int rmnet_ipa_query_tethering_stats(struct wan_ioctl_query_tether_stats *data,
 	if (resp->dl_dst_pipe_stats_list_valid) {
 		for (pipe_len = 0; pipe_len < resp->dl_dst_pipe_stats_list_len;
 			pipe_len++) {
-			IPAWANDBG("Check entry(%d) dl_dst_pipe(%d)\n",
+			IPAWANDBG_LOW("Check entry(%d) dl_dst_pipe(%d)\n",
 				pipe_len, resp->dl_dst_pipe_stats_list
 					[pipe_len].pipe_index);
-			IPAWANDBG("dl_p_v4(%lu)v6(%lu) dl_b_v4(%lu)v6(%lu)\n",
+			IPAWANDBG_LOW
+				("dl_p_v4(%lu)v6(%lu) dl_b_v4(%lu)v6(%lu)\n",
 				(unsigned long int) resp->
 				dl_dst_pipe_stats_list[pipe_len].
 				num_ipv4_packets,
@@ -2640,7 +2744,7 @@ int rmnet_ipa_query_tethering_stats(struct wan_ioctl_query_tether_stats *data,
 			}
 		}
 	}
-	IPAWANDBG("v4_rx_p(%lu) v6_rx_p(%lu) v4_rx_b(%lu) v6_rx_b(%lu)\n",
+	IPAWANDBG_LOW("v4_rx_p(%lu) v6_rx_p(%lu) v4_rx_b(%lu) v6_rx_b(%lu)\n",
 		(unsigned long int) data->ipv4_rx_packets,
 		(unsigned long int) data->ipv6_rx_packets,
 		(unsigned long int) data->ipv4_rx_bytes,
@@ -2649,11 +2753,12 @@ int rmnet_ipa_query_tethering_stats(struct wan_ioctl_query_tether_stats *data,
 	if (resp->ul_src_pipe_stats_list_valid) {
 		for (pipe_len = 0; pipe_len < resp->ul_src_pipe_stats_list_len;
 			pipe_len++) {
-			IPAWANDBG("Check entry(%d) ul_dst_pipe(%d)\n",
+			IPAWANDBG_LOW("Check entry(%d) ul_dst_pipe(%d)\n",
 				pipe_len,
 				resp->ul_src_pipe_stats_list[pipe_len].
 				pipe_index);
-			IPAWANDBG("ul_p_v4(%lu)v6(%lu)ul_b_v4(%lu)v6(%lu)\n",
+			IPAWANDBG_LOW
+				("ul_p_v4(%lu)v6(%lu)ul_b_v4(%lu)v6(%lu)\n",
 				(unsigned long int) resp->
 				ul_src_pipe_stats_list[pipe_len].
 				num_ipv4_packets,
@@ -2689,7 +2794,7 @@ int rmnet_ipa_query_tethering_stats(struct wan_ioctl_query_tether_stats *data,
 			}
 		}
 	}
-	IPAWANDBG("tx_p_v4(%lu)v6(%lu)tx_b_v4(%lu) v6(%lu)\n",
+	IPAWANDBG_LOW("tx_p_v4(%lu)v6(%lu)tx_b_v4(%lu) v6(%lu)\n",
 		(unsigned long int) data->ipv4_tx_packets,
 		(unsigned long  int) data->ipv6_tx_packets,
 		(unsigned long int) data->ipv4_tx_bytes,
@@ -2710,14 +2815,18 @@ int rmnet_ipa_query_tethering_stats_all(
 	tether_stats.ipa_client = data->ipa_client;
 	rc = rmnet_ipa_query_tethering_stats(
 		&tether_stats, data->reset_stats);
-	if (rc)
-		IPAWANERR("WAN_IOC_QUERY_TETHER_STATS failed\n");
+	if (rc) {
+		IPAWANERR("modem WAN_IOC_QUERY_TETHER_STATS failed\n");
+		return rc;
+	}
 	data->tx_bytes = tether_stats.ipv4_tx_bytes
 			+ tether_stats.ipv6_tx_bytes;
 	data->rx_bytes = tether_stats.ipv4_rx_bytes
 			+ tether_stats.ipv6_rx_bytes;
 	return rc;
 }
+
+
 /**
  * ipa_broadcast_quota_reach_ind() - Send Netlink broadcast on Quota
  * @mux_id - The MUX ID on which the quota has been reached
@@ -2768,7 +2877,6 @@ void ipa_broadcast_quota_reach_ind(u32 mux_id)
 	IPAWANERR("putting nlmsg: <%s> <%s> <%s>\n",
 		alert_msg, iface_name_l, iface_name_m);
 	kobject_uevent_env(&(ipa_netdevs[0]->dev.kobj), KOBJ_CHANGE, envp);
-
 	rmnet_ipa_send_quota_reach_ind();
 }
 
@@ -2785,6 +2893,15 @@ void ipa_q6_handshake_complete(bool ssr_bootup)
 {
 	/* It is required to recover the network stats after SSR recovery */
 	if (ssr_bootup) {
+		/*
+		 * In case the uC is required to be loaded by the Modem,
+		 * the proxy vote will be removed only when uC loading is
+		 * complete and indication is received by the AP. After SSR,
+		 * uC is already loaded. Therefore, proxy vote can be removed
+		 * once Modem init is complete.
+		 */
+		ipa2_proxy_clk_unvote();
+
 		/* send SSR power-up notification to IPACM */
 		rmnet_ipa_send_ssr_notification(true);
 
@@ -2793,6 +2910,7 @@ void ipa_q6_handshake_complete(bool ssr_bootup)
 		 * SSR recovery
 		 */
 		rmnet_ipa_get_network_stats_and_update();
+
 		/* Enable holb monitoring on Q6 pipes. */
 		ipa_q6_monitor_holb_mitigation(true);
 	}
@@ -2804,8 +2922,8 @@ static int __init ipa_wwan_init(void)
 	atomic_set(&is_ssr, 0);
 
 	mutex_init(&ipa_to_apps_pipe_handle_guard);
-	ipa_to_apps_hdl = -1;
 	mutex_init(&add_mux_channel_lock);
+	ipa_to_apps_hdl = -1;
 
 	ipa_qmi_init();
 
@@ -2830,7 +2948,6 @@ static void __exit ipa_wwan_cleanup(void)
 		IPAWANERR(
 		"Error subsys_notif_unregister_notifier system %s, ret=%d\n",
 		SUBSYS_MODEM, ret);
-
 	platform_driver_unregister(&rmnet_ipa_driver);
 }
 

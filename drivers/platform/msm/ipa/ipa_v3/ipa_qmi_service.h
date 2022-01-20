@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -31,9 +31,39 @@
 #define SUBSYS_MODEM "modem"
 
 #define IPAWANDBG(fmt, args...) \
-	pr_debug(DEV_NAME " %s:%d " fmt, __func__, __LINE__, ## args)
+	do { \
+		pr_debug(DEV_NAME " %s:%d " fmt, __func__, __LINE__, ## args); \
+		IPA_IPC_LOGGING(ipa_get_ipc_logbuf(), \
+			DEV_NAME " %s:%d " fmt, ## args); \
+		IPA_IPC_LOGGING(ipa_get_ipc_logbuf_low(), \
+			DEV_NAME " %s:%d " fmt, ## args); \
+	} while (0)
+
+
+#define IPAWANDBG_LOW(fmt, args...) \
+	do { \
+		pr_debug(DEV_NAME " %s:%d " fmt, __func__, __LINE__, ## args); \
+		IPA_IPC_LOGGING(ipa_get_ipc_logbuf_low(), \
+			DEV_NAME " %s:%d " fmt, ## args); \
+	} while (0)
+
 #define IPAWANERR(fmt, args...) \
-	pr_err(DEV_NAME " %s:%d " fmt, __func__, __LINE__, ## args)
+	do { \
+		pr_err(DEV_NAME " %s:%d " fmt, __func__, __LINE__, ## args); \
+		IPA_IPC_LOGGING(ipa_get_ipc_logbuf(), \
+			DEV_NAME " %s:%d " fmt, ## args); \
+		IPA_IPC_LOGGING(ipa_get_ipc_logbuf_low(), \
+			DEV_NAME " %s:%d " fmt, ## args); \
+	} while (0)
+
+#define IPAWANINFO(fmt, args...) \
+	do { \
+		pr_info(DEV_NAME " %s:%d " fmt, __func__, __LINE__, ## args); \
+		IPA_IPC_LOGGING(ipa_get_ipc_logbuf(), \
+			DEV_NAME " %s:%d " fmt, ## args); \
+		IPA_IPC_LOGGING(ipa_get_ipc_logbuf_low(), \
+			DEV_NAME " %s:%d " fmt, ## args); \
+	} while (0)
 
 extern struct ipa3_qmi_context *ipa3_qmi_ctx;
 
@@ -43,9 +73,15 @@ u32 q6_ul_filter_rule_hdl[MAX_NUM_Q6_RULE];
 int num_ipa_install_fltr_rule_req_msg;
 struct ipa_install_fltr_rule_req_msg_v01
 		ipa_install_fltr_rule_req_msg_cache[MAX_NUM_QMI_RULE_CACHE];
+int num_ipa_install_fltr_rule_req_ex_msg;
+struct ipa_install_fltr_rule_req_ex_msg_v01
+		ipa_install_fltr_rule_req_ex_msg_cache[MAX_NUM_QMI_RULE_CACHE];
 int num_ipa_fltr_installed_notif_req_msg;
 struct ipa_fltr_installed_notif_req_msg_v01
 		ipa_fltr_installed_notif_req_msg_cache[MAX_NUM_QMI_RULE_CACHE];
+int num_ipa_configure_ul_firewall_rules_req_msg;
+struct ipa_configure_ul_firewall_rules_req_msg_v01
+ipa_configure_ul_firewall_rules_req_msg_cache[MAX_NUM_QMI_RULE_CACHE];
 bool modem_cfg_emb_pipe_flt;
 };
 
@@ -83,6 +119,20 @@ extern struct elem_info ipa3_set_data_usage_quota_resp_msg_data_v01_ei[];
 extern struct elem_info ipa3_data_usage_quota_reached_ind_msg_data_v01_ei[];
 extern struct elem_info ipa3_stop_data_usage_quota_req_msg_data_v01_ei[];
 extern struct elem_info ipa3_stop_data_usage_quota_resp_msg_data_v01_ei[];
+extern struct elem_info ipa3_init_modem_driver_cmplt_req_msg_data_v01_ei[];
+extern struct elem_info ipa3_init_modem_driver_cmplt_resp_msg_data_v01_ei[];
+extern struct elem_info ipa3_install_fltr_rule_req_ex_msg_data_v01_ei[];
+extern struct elem_info ipa3_install_fltr_rule_resp_ex_msg_data_v01_ei[];
+extern struct elem_info ipa3_ul_firewall_rule_type_data_v01_ei[];
+extern struct elem_info ipa3_ul_firewall_config_result_type_data_v01_ei[];
+extern struct elem_info ipa3_per_client_stats_info_type_data_v01_ei[];
+extern struct elem_info ipa3_enable_per_client_stats_req_msg_data_v01_ei[];
+extern struct elem_info ipa3_enable_per_client_stats_resp_msg_data_v01_ei[];
+extern struct elem_info ipa3_get_stats_per_client_req_msg_data_v01_ei[];
+extern struct elem_info ipa3_get_stats_per_client_resp_msg_data_v01_ei[];
+extern struct elem_info ipa3_configure_ul_firewall_rules_req_msg_data_v01_ei[];
+extern struct elem_info ipa3_configure_ul_firewall_rules_resp_msg_data_v01_ei[];
+extern struct elem_info ipa3_configure_ul_firewall_rules_ind_msg_data_v01_ei[];
 
 /**
  * struct ipa3_rmnet_context - IPA rmnet context
@@ -100,19 +150,26 @@ extern struct ipa3_rmnet_context ipa3_rmnet_ctx;
 
 #ifdef CONFIG_RMNET_IPA3
 
-int ipa3_qmi_service_init(bool load_uc, uint32_t wan_platform_type);
+int ipa3_qmi_service_init(uint32_t wan_platform_type);
 
 void ipa3_qmi_service_exit(void);
 
 /* sending filter-install-request to modem*/
-int ipa3_qmi_filter_request_send(struct ipa_install_fltr_rule_req_msg_v01 *req);
+int ipa3_qmi_filter_request_send(
+	struct ipa_install_fltr_rule_req_msg_v01 *req);
+
+int ipa3_qmi_filter_request_ex_send(
+	struct ipa_install_fltr_rule_req_ex_msg_v01 *req);
+
+int ipa3_qmi_ul_filter_request_send(
+	struct ipa_configure_ul_firewall_rules_req_msg_v01 *req);
 
 /* sending filter-installed-notify-request to modem*/
 int ipa3_qmi_filter_notify_send(struct ipa_fltr_installed_notif_req_msg_v01
 		*req);
 
 /* voting for bus BW to ipa_rm*/
-int vote_for_bus_bw(uint32_t *bw_mbps);
+int ipa3_vote_for_bus_bw(uint32_t *bw_mbps);
 
 int ipa3_qmi_enable_force_clear_datapath_send(
 	struct ipa_enable_force_clear_datapath_req_msg_v01 *req);
@@ -121,7 +178,7 @@ int ipa3_qmi_disable_force_clear_datapath_send(
 	struct ipa_disable_force_clear_datapath_req_msg_v01 *req);
 
 int ipa3_copy_ul_filter_rule_to_ipa(struct ipa_install_fltr_rule_req_msg_v01
-	*rule_req, uint32_t *rule_hdl);
+	*rule_req);
 
 int ipa3_wwan_update_mux_channel_prop(void);
 
@@ -142,6 +199,26 @@ int rmnet_ipa3_set_data_quota(struct wan_ioctl_set_data_quota *data);
 
 void ipa3_broadcast_quota_reach_ind(uint32_t mux_id);
 
+int rmnet_ipa3_set_tether_client_pipe(struct wan_ioctl_set_tether_client_pipe
+	*data);
+
+int rmnet_ipa3_query_tethering_stats(struct wan_ioctl_query_tether_stats *data,
+	bool reset);
+
+int rmnet_ipa3_set_lan_client_info(struct wan_ioctl_lan_client_info *data);
+
+int rmnet_ipa3_clear_lan_client_info(struct wan_ioctl_lan_client_info *data);
+
+int rmnet_ipa3_send_lan_client_msg(struct wan_ioctl_send_lan_client_msg *data);
+
+int rmnet_ipa3_enable_per_client_stats(bool *data);
+
+int rmnet_ipa3_query_per_client_stats(
+	struct wan_ioctl_query_per_client_stats *data);
+
+int rmnet_ipa3_query_tethering_stats_all(
+	struct wan_ioctl_query_tether_stats_all *data);
+
 int ipa3_qmi_get_data_stats(struct ipa_get_data_stats_req_msg_v01 *req,
 	struct ipa_get_data_stats_resp_msg_v01 *resp);
 
@@ -154,10 +231,21 @@ int ipa3_qmi_stop_data_qouta(void);
 
 void ipa3_q6_handshake_complete(bool ssr_bootup);
 
+int ipa3_qmi_enable_per_client_stats(
+	struct ipa_enable_per_client_stats_req_msg_v01 *req,
+	struct ipa_enable_per_client_stats_resp_msg_v01 *resp);
+
+int ipa3_qmi_get_per_client_packet_stats(
+	struct ipa_get_stats_per_client_req_msg_v01 *req,
+	struct ipa_get_stats_per_client_resp_msg_v01 *resp);
+
+void ipa3_qmi_init(void);
+
+void ipa3_qmi_cleanup(void);
+
 #else /* CONFIG_RMNET_IPA3 */
 
-static inline int ipa3_qmi_service_init(bool load_uc,
-		uint32_t wan_platform_type)
+static inline int ipa3_qmi_service_init(uint32_t wan_platform_type)
 {
 	return -EPERM;
 }
@@ -167,6 +255,18 @@ static inline void ipa3_qmi_service_exit(void) { }
 /* sending filter-install-request to modem*/
 static inline int ipa3_qmi_filter_request_send(
 	struct ipa_install_fltr_rule_req_msg_v01 *req)
+{
+	return -EPERM;
+}
+
+static inline int ipa3_qmi_ul_filter_request_send(
+	struct ipa_configure_ul_firewall_rules_req_msg_v01 *req)
+{
+	return -EPERM;
+}
+
+static inline int ipa3_qmi_filter_request_ex_send(
+	struct ipa_install_fltr_rule_req_ex_msg_v01 *req)
 {
 	return -EPERM;
 }
@@ -191,7 +291,7 @@ static inline int ipa3_qmi_disable_force_clear_datapath_send(
 }
 
 static inline int ipa3_copy_ul_filter_rule_to_ipa(
-	struct ipa_install_fltr_rule_req_msg_v01 *rule_req, uint32_t *rule_hdl)
+	struct ipa_install_fltr_rule_req_msg_v01 *rule_req)
 {
 	return -EPERM;
 }
@@ -260,6 +360,30 @@ static inline int ipa3_qmi_stop_data_qouta(void)
 
 static inline void ipa3_q6_handshake_complete(bool ssr_bootup) { }
 
-#endif /* CONFIG_RMNET_IPA */
+static inline int ipa3_qmi_enable_per_client_stats(
+	struct ipa_enable_per_client_stats_req_msg_v01 *req,
+	struct ipa_enable_per_client_stats_resp_msg_v01 *resp)
+{
+	return -EPERM;
+}
+
+static inline int ipa3_qmi_get_per_client_packet_stats(
+	struct ipa_get_stats_per_client_req_msg_v01 *req,
+	struct ipa_get_stats_per_client_resp_msg_v01 *resp)
+{
+	return -EPERM;
+}
+
+static inline void ipa3_qmi_init(void)
+{
+
+}
+
+static inline void ipa3_qmi_cleanup(void)
+{
+
+}
+
+#endif /* CONFIG_RMNET_IPA3 */
 
 #endif /* IPA_QMI_SERVICE_H */
