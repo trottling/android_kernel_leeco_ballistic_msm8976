@@ -1967,7 +1967,6 @@ struct softnet_data {
 	struct Qdisc		*output_queue;
 	struct Qdisc		**output_queue_tailp;
 	struct list_head	poll_list;
-	struct napi_struct	*current_napi;
 	struct sk_buff		*completion_queue;
 	struct sk_buff_head	process_queue;
 
@@ -2410,7 +2409,6 @@ gro_result_t napi_gro_receive(struct napi_struct *napi, struct sk_buff *skb);
 void napi_gro_flush(struct napi_struct *napi, bool flush_old);
 struct sk_buff *napi_get_frags(struct napi_struct *napi);
 gro_result_t napi_gro_frags(struct napi_struct *napi);
-struct napi_struct *get_current_napi_context(void);
 
 static inline void napi_free_frags(struct napi_struct *napi)
 {
