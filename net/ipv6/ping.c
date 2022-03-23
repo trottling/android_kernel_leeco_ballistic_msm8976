@@ -102,10 +102,9 @@ int ping_v6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 
 	if (msg->msg_name) {
 		DECLARE_SOCKADDR(struct sockaddr_in6 *, u, msg->msg_name);
-		if (msg->msg_namelen < sizeof(*u))
+		if (msg->msg_namelen < sizeof(struct sockaddr_in6) ||
+		    u->sin6_family != AF_INET6) {
 			return -EINVAL;
-		if (u->sin6_family != AF_INET6) {
-			return -EAFNOSUPPORT;
 		}
 		daddr = &(u->sin6_addr);
 		if (__ipv6_addr_needs_scope_id(ipv6_addr_type(daddr)))
