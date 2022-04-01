@@ -1089,6 +1089,7 @@ int iscsit_process_scsi_cmd(struct iscsi_conn *conn, struct iscsi_cmd *cmd,
 		if (cmd->reject_reason)
 			return 0;
 
+		target_put_sess_cmd(conn->sess->se_sess, &cmd->se_cmd);
 		return 1;
 	}
 	/*
@@ -1126,10 +1127,14 @@ after_immediate_data:
 		 */
 		cmdsn_ret = iscsit_sequence_cmd(cmd->conn, cmd,
 					(unsigned char *)hdr, hdr->cmdsn);
-		if (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER)
+		if (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER) {
 			return -1;
+		} else if (cmdsn_ret == CMDSN_LOWER_THAN_EXP) {
+			target_put_sess_cmd(conn->sess->se_sess, &cmd->se_cmd);
+			return 0;
+		}
 
-		if (cmd->sense_reason || cmdsn_ret == CMDSN_LOWER_THAN_EXP) {
+		if (cmd->sense_reason) {
 			int rc;
 
 			rc = iscsit_dump_data_payload(cmd->conn,
