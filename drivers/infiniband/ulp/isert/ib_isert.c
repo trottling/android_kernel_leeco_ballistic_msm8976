@@ -1092,7 +1092,7 @@ isert_handle_scsi_cmd(struct isert_conn *isert_conn,
 	}
 
 sequence_cmd:
-	rc = iscsit_sequence_cmd(conn, cmd, buf, hdr->cmdsn);
+	rc = iscsit_sequence_cmd(conn, cmd, hdr->cmdsn);
 
 	if (!rc && dump_payload == false && unsol_data)
 		iscsit_set_unsoliticed_dataout(cmd);

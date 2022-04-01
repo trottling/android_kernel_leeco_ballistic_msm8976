@@ -1088,7 +1088,7 @@ int iscsit_handle_ooo_cmdsn(
 
 	ooo_cmdsn = iscsit_allocate_ooo_cmdsn();
 	if (!ooo_cmdsn)
-		return -ENOMEM;
+		return CMDSN_ERROR_CANNOT_RECOVER;
 
 	ooo_cmdsn->cmd			= cmd;
 	ooo_cmdsn->batch_count		= (batch) ?
@@ -1099,10 +1099,10 @@ int iscsit_handle_ooo_cmdsn(
 
 	if (iscsit_attach_ooo_cmdsn(sess, ooo_cmdsn) < 0) {
 		kmem_cache_free(lio_ooo_cache, ooo_cmdsn);
-		return -ENOMEM;
+		return CMDSN_ERROR_CANNOT_RECOVER;
 	}
 
-	return 0;
+	return CMDSN_HIGHER_THAN_EXP;
 }
 
 static int iscsit_set_dataout_timeout_values(

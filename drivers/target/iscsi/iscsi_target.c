@@ -1055,11 +1055,11 @@ int iscsit_process_scsi_cmd(struct iscsi_conn *conn, struct iscsi_cmd *cmd,
 	 * be acknowledged. (See below)
 	 */
 	if (!cmd->immediate_data) {
-		cmdsn_ret = iscsit_sequence_cmd(conn, cmd,
-					(unsigned char *)hdr, hdr->cmdsn);
-		if (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER)
-			return -1;
-		else if (cmdsn_ret == CMDSN_LOWER_THAN_EXP) {
+		cmdsn_ret = iscsit_sequence_cmd(conn, cmd, hdr->cmdsn);
+		if (cmdsn_ret == CMDSN_LOWER_THAN_EXP) {
+			if (!cmd->sense_reason)
+				return 0;
+
 			target_put_sess_cmd(conn->sess->se_sess, &cmd->se_cmd);
 			return 0;
 		}
@@ -1086,9 +1086,6 @@ int iscsit_process_scsi_cmd(struct iscsi_conn *conn, struct iscsi_cmd *cmd,
 	 * iscsit_check_received_cmdsn() in iscsit_get_immediate_data() below.
 	 */
 	if (cmd->sense_reason) {
-		if (cmd->reject_reason)
-			return 0;
-
 		target_put_sess_cmd(conn->sess->se_sess, &cmd->se_cmd);
 		return 1;
 	}
@@ -1097,8 +1094,10 @@ int iscsit_process_scsi_cmd(struct iscsi_conn *conn, struct iscsi_cmd *cmd,
 	 * the backend memory allocation.
 	 */
 	cmd->sense_reason = transport_generic_new_cmd(&cmd->se_cmd);
-	if (cmd->sense_reason)
+	if (cmd->sense_reason) {
+		target_put_sess_cmd(conn->sess->se_sess, &cmd->se_cmd);
 		return 1;
+	}
 
 	return 0;
 }
@@ -1108,7 +1107,6 @@ static int
 iscsit_get_immediate_data(struct iscsi_cmd *cmd, struct iscsi_scsi_req *hdr,
 			  bool dump_payload)
 {
-	struct iscsi_conn *conn = cmd->conn;
 	int cmdsn_ret = 0, immed_ret = IMMEDIATE_DATA_NORMAL_OPERATION;
 	/*
 	 * Special case for Unsupported SAM WRITE Opcodes and ImmediateData=Yes.
@@ -1125,22 +1123,12 @@ after_immediate_data:
 		 * DataCRC, check against ExpCmdSN/MaxCmdSN if
 		 * Immediate Bit is not set.
 		 */
-		cmdsn_ret = iscsit_sequence_cmd(cmd->conn, cmd,
-					(unsigned char *)hdr, hdr->cmdsn);
-		if (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER) {
-			return -1;
-		} else if (cmdsn_ret == CMDSN_LOWER_THAN_EXP) {
-			target_put_sess_cmd(conn->sess->se_sess, &cmd->se_cmd);
-			return 0;
-		}
+		cmdsn_ret = iscsit_sequence_cmd(cmd->conn, cmd, hdr->cmdsn);
 
 		if (cmd->sense_reason) {
-			int rc;
-
-			rc = iscsit_dump_data_payload(cmd->conn,
-						      cmd->first_burst_len, 1);
-			target_put_sess_cmd(conn->sess->se_sess, &cmd->se_cmd);
-			return rc;
+			if (iscsit_dump_data_payload(cmd->conn,
+					cmd->first_burst_len, 1) < 0)
+				return -1;
 		} else if (cmd->unsolicited_data)
 			iscsit_set_unsoliticed_dataout(cmd);
 
@@ -1174,7 +1162,7 @@ iscsit_handle_scsi_cmd(struct iscsi_conn *conn, struct iscsi_cmd *cmd,
 
 	rc = iscsit_setup_scsi_cmd(conn, cmd, buf);
 	if (rc < 0)
-		return 0;
+		return rc;
 	/*
 	 * Allocation iovecs needed for struct socket operations for
 	 * traditional iSCSI block I/O.
@@ -1509,7 +1497,7 @@ static int iscsit_handle_data_out(struct iscsi_conn *conn, unsigned char *buf)
 
 	rc = iscsit_check_dataout_hdr(conn, buf, &cmd);
 	if (rc < 0)
-		return 0;
+		return rc;
 	else if (!cmd)
 		return 0;
 
@@ -1681,8 +1669,7 @@ int iscsit_handle_nop_out(struct iscsi_conn *conn, struct iscsi_cmd *cmd,
 			return 0;
 		}
 
-		cmdsn_ret = iscsit_sequence_cmd(conn, cmd,
-				(unsigned char *)hdr, hdr->cmdsn);
+		cmdsn_ret = iscsit_sequence_cmd(conn, cmd, hdr->cmdsn);
 		if (cmdsn_ret == CMDSN_LOWER_THAN_EXP) {
 			ret = 0;
 			goto ping_out;
@@ -1908,7 +1895,7 @@ attach:
 	spin_unlock_bh(&conn->cmd_lock);
 
 	if (!(hdr->opcode & ISCSI_OP_IMMEDIATE)) {
-		int cmdsn_ret = iscsit_sequence_cmd(conn, cmd, buf, hdr->cmdsn);
+		int cmdsn_ret = iscsit_sequence_cmd(conn, cmd, hdr->cmdsn);
 		if (cmdsn_ret == CMDSN_HIGHER_THAN_EXP)
 			out_of_order_cmdsn = 1;
 		else if (cmdsn_ret == CMDSN_LOWER_THAN_EXP)
@@ -2085,8 +2072,7 @@ static int iscsit_handle_text_cmd(
 	iscsit_ack_from_expstatsn(conn, be32_to_cpu(hdr->exp_statsn));
 
 	if (!(hdr->opcode & ISCSI_OP_IMMEDIATE)) {
-		cmdsn_ret = iscsit_sequence_cmd(conn, cmd,
-				(unsigned char *)hdr, hdr->cmdsn);
+		cmdsn_ret = iscsit_sequence_cmd(conn, cmd, hdr->cmdsn);
 		if (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER)
 			return -1;
 
@@ -2273,7 +2259,7 @@ iscsit_handle_logout_cmd(struct iscsi_conn *conn, struct iscsi_cmd *cmd,
 		if (ret < 0)
 			return ret;
 	} else {
-		cmdsn_ret = iscsit_sequence_cmd(conn, cmd, buf, hdr->cmdsn);
+		cmdsn_ret = iscsit_sequence_cmd(conn, cmd, hdr->cmdsn);
 		if (cmdsn_ret == CMDSN_LOWER_THAN_EXP)
 			logout_remove = 0;
 		else if (cmdsn_ret == CMDSN_ERROR_CANNOT_RECOVER)
