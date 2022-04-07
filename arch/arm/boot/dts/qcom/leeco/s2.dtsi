@@ -23,27 +23,25 @@
 };
 
 /delete-node/ &cont_splash_mem;
+/delete-node/ &other_ext_mem;
 
 / {
-	memory {
-		ramoops_mem: ramoops_region@0 {
-			linux,reserve-contiguous-region;
-			linux,reserve-region;
+	reserved-memory {
+		ramoops_mem: ramoops_region@9ff00000 {
+			compatible = "removed-dma-pool";
+			no-map;
 			reg = <0x0 0x9ff00000 0x0 0x00100000>;
-			linux,remove-completely;
-			label = "ramoops_mem";
 		};
 
-		other_ext_mem: other_ext_region@0 {
-			/delete-property/ reg;
+		other_ext_mem: other_ext_region@84A00000 {
+			compatible = "removed-dma-pool";
+			no-map;
 			reg = <0x0 0x84A00000 0x0 0x1E00000>;
+			label = "other_ext_mem";
 		};
 
 		cont_splash_mem: splash_region@82000000 {
-			linux,reserve-contiguous-region;
-			linux,reserve-region;
 			reg = <0x0 0x82000000 0x0 0x2800000>;
-			label = "cont_splash_mem";
 		};
 	};
 };
@@ -345,7 +343,7 @@
 		android,ramoops-ftrace-size = <0x10000>;
 		android,ramoops-pmsg-size = <0x20000>;
 		android,ramoops-dump-oops = <0x1>;
-		linux,contiguous-region = <&ramoops_mem>;
+		memory-region = <&ramoops_mem>;
 	};
 
 	qcom_seecom: qseecom@84A00000 {
