@@ -178,7 +178,9 @@ source "drivers/fmc/Kconfig"
 
 source "drivers/android/Kconfig"
 
-source "drivers/coresight/Kconfig"
+source "drivers/hwtracing/stm/Kconfig"
+
+source "drivers/hwtracing/intel_th/Kconfig"
 
 source "drivers/powercap/Kconfig"
 
