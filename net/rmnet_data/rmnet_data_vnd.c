@@ -553,7 +553,7 @@ int rmnet_vnd_init(void)
  *      - RMNET_CONFIG_UNKNOWN_ERROR if register_netdevice() fails
  */
 int rmnet_vnd_create_dev(int id, struct net_device **new_device,
-			 const char *prefix, int use_name)
+			 const char *prefix)
 {
 	struct net_device *dev;
 	char dev_prefix[IFNAMSIZ];
@@ -569,15 +569,12 @@ int rmnet_vnd_create_dev(int id, struct net_device **new_device,
 		return RMNET_CONFIG_DEVICE_IN_USE;
 	}
 
-	if (!prefix && !use_name)
+	if (!prefix)
 		p = scnprintf(dev_prefix, IFNAMSIZ, "%s%%d",
 			  RMNET_DATA_DEV_NAME_STR);
-	else if (prefix && use_name)
-		p = scnprintf(dev_prefix, IFNAMSIZ, "%s", prefix);
-	else if (prefix && !use_name)
-		p = scnprintf(dev_prefix, IFNAMSIZ, "%s%%d", prefix);
 	else
-		return RMNET_CONFIG_BAD_ARGUMENTS;
+		p = scnprintf(dev_prefix, IFNAMSIZ, "%s%%d",
+			  prefix);
 	if (p >= (IFNAMSIZ-1)) {
 		LOGE("Specified prefix longer than IFNAMSIZ");
 		return RMNET_CONFIG_BAD_ARGUMENTS;
