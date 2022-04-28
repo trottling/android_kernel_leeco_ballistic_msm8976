@@ -52,7 +52,6 @@ struct ipv6_devconf {
 	__s32		force_tllao;
 	__s32           ndisc_notify;
 	__s32		suppress_frag_ndisc;
-	__s32		accept_ra_prefix_route;
 	__s32		accept_ra_mtu;
 	__s32		use_oif_addrs_only;
 	void		*sysctl;

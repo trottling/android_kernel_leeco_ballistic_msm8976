@@ -1297,11 +1297,6 @@ accept_ra_rtr_pref - BOOLEAN
 	Functional default: enabled if accept_ra is enabled.
 			    disabled if accept_ra is disabled.
 
-accept_ra_prefix_route - BOOLEAN
-	Set the prefix route for the autoconfigured interface address
-
-	Functional default: enabled
-
 accept_ra_mtu - BOOLEAN
 	Apply the MTU value specified in RA option 5 (RFC4861). If
 	disabled, the MTU specified in the RA will be ignored.
