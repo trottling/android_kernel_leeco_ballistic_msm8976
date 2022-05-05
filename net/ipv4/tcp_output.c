@@ -2040,7 +2040,7 @@ bool tcp_schedule_loss_probe(struct sock *sk)
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
 	u32 rtt = usecs_to_jiffies(tp->srtt_us >> 3);
-	u32 timeout, rto_delta;
+	u32 timeout, rto_delta_us;
 
 	if (WARN_ON(icsk->icsk_pending == ICSK_TIME_EARLY_RETRANS))
 		return false;
@@ -2080,9 +2080,9 @@ bool tcp_schedule_loss_probe(struct sock *sk)
 	timeout = max_t(u32, timeout, msecs_to_jiffies(10));
 
 	/* If the RTO formula yields an earlier time, then use that time. */
-	rto_delta = tcp_rto_delta(sk);  /* How far in future is RTO? */
-	if (rto_delta > 0)
-		timeout = min_t(u32, timeout, rto_delta);
+	rto_delta_us = tcp_rto_delta_us(sk);  /* How far in future is RTO? */
+	if (rto_delta_us > 0)
+		timeout = min_t(u32, timeout, usecs_to_jiffies(rto_delta_us));
 
 	inet_csk_reset_xmit_timer(sk, ICSK_TIME_LOSS_PROBE, timeout,
 				  TCP_RTO_MAX);

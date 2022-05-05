@@ -1666,14 +1666,14 @@ int tcpv4_offload_init(void);
 void tcp_v4_init(void);
 void tcp_init(void);
 
-/* At how many jiffies into the future should the RTO fire? */
-static inline s32 tcp_rto_delta(const struct sock *sk)
+/* At how many usecs into the future should the RTO fire? */
+static inline s64 tcp_rto_delta_us(const struct sock *sk)
 {
 	const struct sk_buff *skb = tcp_write_queue_head(sk);
-	const u32 rto = inet_csk(sk)->icsk_rto;
-	const u32 rto_time_stamp = TCP_SKB_CB(skb)->when + rto;
+	u32 rto = inet_csk(sk)->icsk_rto;
+	u64 rto_time_stamp_us = jiffies_to_usecs(rto);
 
-	return (s32)(rto_time_stamp - tcp_time_stamp);
+	return rto_time_stamp_us - tcp_time_stamp;
 }
 
 #endif	/* _TCP_H */

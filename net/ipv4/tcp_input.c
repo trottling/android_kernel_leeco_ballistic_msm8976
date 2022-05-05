@@ -2949,11 +2949,11 @@ void tcp_rearm_rto(struct sock *sk)
 		/* Offset the time elapsed after installing regular RTO */
 		if (icsk->icsk_pending == ICSK_TIME_EARLY_RETRANS ||
 		    icsk->icsk_pending == ICSK_TIME_LOSS_PROBE) {
-			s32 delta = tcp_rto_delta(sk);
-			/* delta may not be positive if the socket is locked
+			s64 delta_us = tcp_rto_delta_us(sk);
+			/* delta_us may not be positive if the socket is locked
 			 * when the retrans timer fires and is rescheduled.
 			 */
-			rto = max_t(int, delta, 1);
+			rto = usecs_to_jiffies(max_t(int, delta_us, 1));
 		}
 		inet_csk_reset_xmit_timer(sk, ICSK_TIME_RETRANS, rto,
 					  TCP_RTO_MAX);
