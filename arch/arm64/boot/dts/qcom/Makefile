@@ -574,6 +574,7 @@ dtb-$(CONFIG_MACH_SONY_KUGO) += msm8956-loire-kugo_generic.dtb \
 	msm8976-loire-kugo_generic.dtb \
 	msm8956-v1.1-loire-kugo_generic.dtb \
 	msm8976-v1.1-loire-kugo_generic.dtb
+dtb-$(CONFIG_MACH_LEECO_S2) += s2.dtb
 endif
 
 dtb-$(CONFIG_ARCH_MSM8953) += msm8953-cdp.dtb \

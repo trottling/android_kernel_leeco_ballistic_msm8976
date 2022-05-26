@@ -1,0 +1,138 @@
+/*  Date            Author    	          Why              jira
+*/
+
+&soc {
+	tlmm_pinmux: pinctrl@1000000 {
+
+		goodix_reset: goodix_reset {
+			qcom,pins = <&gp 110>;
+			qcom,num-grp-pins = <1>;
+			qcom,pin-func = <0>;
+			label = "goodix_reset";
+			goodix_reset_active: active {
+				drive-strength = <2>;
+				bias-disable;
+				output-high;
+			};
+			goodix_reset_reset: reset {
+				drive-strength = <2>;
+				bias-disable;
+				output-low;
+			};
+		};
+		goodix_irq: goodix_irq {
+			qcom,pins = <&gp 106>;
+			qcom,num-grp-pins = <1>;
+			qcom,pin-func = <0>;
+			label = "goodix_irq";
+			goodix_irq_active: active {
+				drive-strength = <2>;
+				bias-disable;
+				input-enable;
+			};
+		};
+
+		audio_switch_pin {
+			qcom,pins = <&gp 111>;
+			qcom,pin-func = <0>;
+			qcom,num-grp-pins = <1>;
+			label = "audio_switch_pin";
+			audio_switch_active: active {
+				drive-strength = <6>;
+				bias-pull-up;
+			};
+			audio_switch_suspend: suspend {
+				drive-strength = <2>;
+				bias-pull-down;
+			};
+		};
+
+		vconn1_swch_pin {
+			qcom,pins = <&gp 20>;
+			qcom,pin-func = <0>;
+			qcom,num-grp-pins = <1>;
+			label = "vconn1_swch_pin";
+			vconn1_swch_active: active {
+				drive-strength = <6>;
+				bias-pull-up;
+			};
+			vconn1_swch_suspend: suspend {
+				drive-strength = <2>;
+				bias-pull-down;
+			};
+		};
+
+		vconn2_swch_pin {
+			qcom,pins = <&gp 115>;
+			qcom,pin-func = <0>;
+			qcom,num-grp-pins = <1>;
+			label = "vconn2_swch_pin";
+			vconn2_swch_active: active {
+				drive-strength = <6>;
+				bias-pull-up;
+			};
+			vconn2_swch_suspend: suspend {
+				drive-strength = <2>;
+				bias-pull-down;
+			};
+		};
+
+		board_id_pin {
+			qcom,pins = <&gp 62>, <&gp 63>, <&gp 66>;
+			qcom,pin-func = <0>;
+			qcom,num-grp-pins = <3>;
+			label = "board_id_pin";
+			board_id_active: active {
+				drive-strength = <2>;
+				input-enable;
+				bias-pull-up;
+			};
+			board_id_suspend: suspend {
+				drive-strength = <2>;
+				input-enable;
+				bias-pull-down;
+			};
+		};
+
+		headset_detect_pin {
+			qcom,pins = <&gp 114>;
+			qcom,pin-func = <0>;
+			qcom,num-grp-pins = <1>;
+			label = "headset_detect_pin";
+			headset_active: active {
+				drive-strength = <2>;
+				bias-disable; /* NO pull */
+			};
+			headset_suspend: suspend {
+				drive-strength = <2>;
+				bias-disable; /* NO pull */
+			};
+		};
+
+		usb_irq_pin {
+			qcom,pins = <&gp 21>;
+			qcom,pin-func = <0>;
+			qcom,num-grp-pins = <1>;
+			label = "ti_usb_enb_irq";
+			usb_irq_active: active {
+				drive-strength = <2>;
+				bias-disable; /* NO pull */
+			};
+		};
+
+		hph_lr_swch_pin {
+			qcom,pins = <&gp 16>;
+			qcom,pin-func = <0>;
+			qcom,num-grp-pins = <1>;
+			label = "hph_lr_swch_pin";
+			hph_lr_switch_active: active {
+				drive-strength = <6>;
+				bias-pull-up;
+			};
+			hph_lr_switch_suspend: suspend {
+				drive-strength = <2>;
+				bias-pull-down;
+			};
+		};
+	};
+};
