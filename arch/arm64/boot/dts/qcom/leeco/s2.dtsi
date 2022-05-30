@@ -23,6 +23,7 @@
 };
 
 /delete-node/ &cont_splash_mem;
+/delete-node/ &other_ext_mem;
 
 / {
 	reserved-memory {
@@ -237,39 +238,6 @@
 	/delete-property/ cd-gpios;
 
 	status = "disabled";
-};
-
-&android_usb {
-	qcom,android-usb-cdrom;
-};
-
-&usb_otg {
-	qcom,hsusb-otg-phy-init-seq =
-			<0x73 0x80 0x0a 0x81 0x3f 0x82 0x33 0x83 0xffffffff>;
-};
-
-/* CoreSight */
-&tpiu {
-	pinctrl-names = "sdcard", "trace", "swduart",
-			"swdtrc", "jtag", "spmi";
-	/* NIDnT */
-	pinctrl-0 = <&qdsd_clk_sdcard &qdsd_cmd_sdcard
-			 &qdsd_data0_sdcard &qdsd_data1_sdcard
-			 &qdsd_data2_sdcard &qdsd_data3_sdcard>;
-	pinctrl-1 = <&qdsd_clk_trace &qdsd_cmd_trace
-			 &qdsd_data0_trace &qdsd_data1_trace
-			 &qdsd_data2_trace &qdsd_data3_trace>;
-	pinctrl-2 = <&qdsd_cmd_swduart &qdsd_data0_swduart
-			 &qdsd_data1_swduart &qdsd_data2_swduart
-			 &qdsd_data3_swduart>;
-	pinctrl-3 = <&qdsd_clk_swdtrc &qdsd_cmd_swdtrc
-			 &qdsd_data0_swdtrc &qdsd_data1_swdtrc
-			 &qdsd_data2_swdtrc &qdsd_data3_swdtrc>;
-	pinctrl-4 = <&qdsd_cmd_jtag &qdsd_data0_jtag
-			 &qdsd_data1_jtag &qdsd_data2_jtag
-			 &qdsd_data3_jtag>;
-	pinctrl-5 = <&qdsd_clk_spmi &qdsd_cmd_spmi
-			 &qdsd_data0_spmi &qdsd_data3_spmi>;
 };
 
 &i2c_4 { /* BLSP1 QUP4 */
@@ -593,7 +561,7 @@
 	bias-disable;
 };
 
-&pmi8950_haptic {
+&pmi_haptic {
 	qcom,vmax-mv = <3300>;
 };
 
@@ -630,16 +598,6 @@
 	qcom,mdss-dsi-pan-fps-update = "dfps_immediate_porch_mode_hfp";
 };
 
-&pmx_mdss {
-	qcom,num-grp-pins = <1>;
-	qcom,pins = <&gp 25>;
-};
-
-&pmx_mdss_te {
-	qcom,num-grp-pins = <1>;
-	qcom,pins = <&gp 24>;
-};
-
 &mdss_dsi0 {
 	pinctrl-names = "mdss_default", "mdss_sleep";
 	pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
@@ -656,7 +614,7 @@
 	};
 };
 
-&pmi8950_charger {
+&qpnp_smbcharger {
 	qcom,float-voltage-mv = <4400>;
 	qcom,chg-led-sw-controls;
 	qcom,thermal-mitigation = <4500 3000 2000 1000 900 600 0>;
@@ -675,7 +633,7 @@
 	qcom,vchg_sns-vadc = <&pmi8950_vadc>;
 };
 
-&pmi8950_fg {
+&qpnp_fg {
 	qcom,battery-data = <&qrd_batterydata>;
 	qcom,cold-bat-decidegc = <(0)>;
 	qcom,cool-bat-decidegc = <(150)>;
