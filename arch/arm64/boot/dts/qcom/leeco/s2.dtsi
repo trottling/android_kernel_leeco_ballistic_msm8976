@@ -464,13 +464,6 @@
 	};
 };
 
-&tlmm_pinmux {
-	tlmm_gpio_key {
-		qcom,pins = <&gp 112>, <&gp 113>;
-		qcom,num-grp-pins = <2>;
-	};
-};
-
 &spmi_bus {
 		qcom,pmi8950@3 {
 				qcom,leds@d800 {
