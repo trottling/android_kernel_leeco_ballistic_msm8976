@@ -25,13 +25,15 @@
 /delete-node/ &cont_splash_mem;
 
 / {
-	memory {
-		ramoops_mem: ramoops_region@0 {
-			linux,reserve-contiguous-region;
-			linux,reserve-region;
-			reg = <0x0 0x9ff00000 0x0 0x00100000>;
-			linux,remove-completely;
-			label = "ramoops_mem";
+	reserved-memory {
+		ramoops: ramoops@9ff00000 {
+			compatible = "removed-dma-pool", "ramoops";
+			no-map;
+			reg = <0 0x9ff00000 0 0x00100000>;
+			record-size = <0x10000>;
+			console-size = <0x60000>;
+			ftrace-size = <0x10000>;
+			pmsg-size = <0x20000>;
 		};
 
 		other_ext_mem: other_ext_region@0 {
@@ -40,8 +42,6 @@
 		};
 
 		cont_splash_mem: splash_region@82000000 {
-			linux,reserve-contiguous-region;
-			linux,reserve-region;
 			reg = <0x0 0x82000000 0x0 0x2800000>;
 			label = "cont_splash_mem";
 		};
@@ -311,19 +311,6 @@
 /delete-node/ &qcom_seecom;
 
 &soc {
-	ramoops {
-		compatible = "ramoops";
-		status = "ok";
-		android,ramoops-buffer-start = <0x9ff00000>;
-		android,ramoops-buffer-size =  <0x100000>;
-		android,ramoops-console-size = <0x60000>;
-		android,ramoops-record-size = <0x10000>;
-		android,ramoops-ftrace-size = <0x10000>;
-		android,ramoops-pmsg-size = <0x20000>;
-		android,ramoops-dump-oops = <0x1>;
-		linux,contiguous-region = <&ramoops_mem>;
-	};
-
 	qcom_seecom: qseecom@84A00000 {
 		compatible = "qcom,qseecom";
 		reg = <0x84A00000 0x1900000>;
