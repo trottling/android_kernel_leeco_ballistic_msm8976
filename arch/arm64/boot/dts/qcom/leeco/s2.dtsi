@@ -511,6 +511,10 @@
 	qcom,mdss-pref-prim-intf = "dsi";
 };
 
+&mdss_dsi {
+	hw-config = "single_dsi";
+};
+
 &mdss_fb0 {
 	 /delete-property/ qcom,mdss-fb-splash-logo-enabled;
 };
@@ -541,11 +545,19 @@
 };
 
 &mdss_dsi0 {
+	lab-supply = <&lab_regulator>;
+	ibb-supply = <&ibb_regulator>;
+	/delete-property/ vdd-supply;
+
+	qcom,dsi-pref-prim-pan = <&dsi_nt35596_1080_vid>;
 	pinctrl-names = "mdss_default", "mdss_sleep";
 	pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
 	pinctrl-1 = <&mdss_dsi_suspend &mdss_te_suspend>;
-	qcom,dsi-pref-prim-pan = <&dsi_nt35596_1080_vid>;
 	qcom,platform-reset-gpio = <&msm_gpio 25 0>;
+};
+
+&mdss_dsi1 {
+	status = "disabled";
 };
 
 / {
