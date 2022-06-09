@@ -142,9 +142,9 @@
 	};
 
 	drv2604l@5a {
-		compatible = "ti,haptic_drv2604l";
+		compatible = "ti,drv2604l";
 		reg = <0x5a>;
-		ti,drv2604l-enable-gpio = <&msm_gpio 109 0>;
+		enable-gpio = <&msm_gpio 109 0>;
 	};
 };
 
