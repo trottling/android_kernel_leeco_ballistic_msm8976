@@ -2,137 +2,219 @@
 */
 
 &soc {
-	tlmm_pinmux: pinctrl@1000000 {
+	msm_gpio: pinctrl@1000000 {
 
-		goodix_reset: goodix_reset {
-			qcom,pins = <&gp 110>;
-			qcom,num-grp-pins = <1>;
-			qcom,pin-func = <0>;
-			label = "goodix_reset";
-			goodix_reset_active: active {
-				drive-strength = <2>;
-				bias-disable;
-				output-high;
+		goodix_reset_reset: goodix_reset_reset{
+			mux {
+				pins = "gpio110";
+				function = "gpio";
 			};
-			goodix_reset_reset: reset {
+
+			config {
+				pins = "gpio110";
 				drive-strength = <2>;
-				bias-disable;
+				bias-disable = <0>;
 				output-low;
 			};
 		};
-		goodix_irq: goodix_irq {
-			qcom,pins = <&gp 106>;
-			qcom,num-grp-pins = <1>;
-			qcom,pin-func = <0>;
-			label = "goodix_irq";
-			goodix_irq_active: active {
+
+		goodix_reset_active: goodix_reset_active{
+			mux {
+				pins = "gpio110";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio110";
 				drive-strength = <2>;
-				bias-disable;
+				bias-disable = <0>;
+				output-high;
+			};
+		};
+
+		goodix_irq_active: goodix_irq_active {
+			mux {
+				pins = "gpio106";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio106";
+				drive-strength = <2>;
+				bias-disable = <0>;
 				input-enable;
 			};
 		};
 
-		audio_switch_pin {
-			qcom,pins = <&gp 111>;
-			qcom,pin-func = <0>;
-			qcom,num-grp-pins = <1>;
-			label = "audio_switch_pin";
-			audio_switch_active: active {
-				drive-strength = <6>;
-				bias-pull-up;
-			};
-			audio_switch_suspend: suspend {
-				drive-strength = <2>;
-				bias-pull-down;
-			};
+	audio_switch_active: audio_switch_active {
+		mux {
+			pins = "gpio111";
+			function = "gpio";
 		};
 
-		vconn1_swch_pin {
-			qcom,pins = <&gp 20>;
-			qcom,pin-func = <0>;
-			qcom,num-grp-pins = <1>;
-			label = "vconn1_swch_pin";
-			vconn1_swch_active: active {
-				drive-strength = <6>;
-				bias-pull-up;
-			};
-			vconn1_swch_suspend: suspend {
-				drive-strength = <2>;
-				bias-pull-down;
-			};
+		config {
+			pins = "gpio111";
+			drive-strength = <6>;
+			bias-pull-up;
+		};
+	};
+
+	audio_switch_suspend: audio_switch_suspend {
+		mux {
+			pins = "gpio111";
+			function = "gpio";
 		};
 
-		vconn2_swch_pin {
-			qcom,pins = <&gp 115>;
-			qcom,pin-func = <0>;
-			qcom,num-grp-pins = <1>;
-			label = "vconn2_swch_pin";
-			vconn2_swch_active: active {
-				drive-strength = <6>;
-				bias-pull-up;
-			};
-			vconn2_swch_suspend: suspend {
-				drive-strength = <2>;
-				bias-pull-down;
-			};
+		config {
+			pins = "gpio111";
+			drive-strength = <2>;
+			bias-pull-down;
+		};
+	};
+
+	vconn1_swch_active: vconn1_swch_active {
+		mux {
+			pins = "gpio20";
+			function = "gpio";
 		};
 
-		board_id_pin {
-			qcom,pins = <&gp 62>, <&gp 63>, <&gp 66>;
-			qcom,pin-func = <0>;
-			qcom,num-grp-pins = <3>;
-			label = "board_id_pin";
-			board_id_active: active {
+		config {
+			pins = "gpio20";
+			drive-strength = <6>;
+			bias-pull-up;
+		};
+	};
+
+	vconn1_swch_suspend: vconn1_swch_suspend {
+		mux {
+			pins = "gpio20";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio20";
+			drive-strength = <2>;
+			bias-pull-down;
+		};
+	};
+
+	vconn2_swch_active: vconn2_swch_active {
+		mux {
+			pins = "gpio115";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio115";
+			drive-strength = <6>;
+			bias-pull-up;
+		};
+	};
+
+	vconn2_swch_suspend: vconn2_swch_suspend {
+		mux {
+			pins = "gpio115";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio115";
+			drive-strength = <2>;
+			bias-pull-down;
+		};
+	};
+
+	board_id_active: board_id_active {
+		mux {
+			pins = "gpio62", "gpio63", "gpio66";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio62", "gpio63", "gpio66";
+			drive-strength = <2>;
+			input-enable;
+			bias-pull-up;
+		};
+	};
+
+	board_id_suspend: board_id_suspend {
+		mux {
+			pins = "gpio62", "gpio63", "gpio66";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio62", "gpio63", "gpio66";
 				drive-strength = <2>;
 				input-enable;
-				bias-pull-up;
-			};
-			board_id_suspend: suspend {
-				drive-strength = <2>;
-				input-enable;
 				bias-pull-down;
-			};
+		};
+	};
+
+	headset_active: headset_active {
+		mux {
+			pins = "gpio114";
+			function = "gpio";
 		};
 
-		headset_detect_pin {
-			qcom,pins = <&gp 114>;
-			qcom,pin-func = <0>;
-			qcom,num-grp-pins = <1>;
-			label = "headset_detect_pin";
-			headset_active: active {
-				drive-strength = <2>;
-				bias-disable; /* NO pull */
-			};
-			headset_suspend: suspend {
-				drive-strength = <2>;
-				bias-disable; /* NO pull */
-			};
+		config {
+			pins = "gpio114";
+			drive-strength = <2>;
+			bias-disable; /* NO pull */
+		};
+	};
+
+	headset_suspend: headset_suspend {
+		mux {
+			pins = "gpio114";
+			function = "gpio";
 		};
 
-		usb_irq_pin {
-			qcom,pins = <&gp 21>;
-			qcom,pin-func = <0>;
-			qcom,num-grp-pins = <1>;
-			label = "ti_usb_enb_irq";
-			usb_irq_active: active {
-				drive-strength = <2>;
-				bias-disable; /* NO pull */
-			};
+		config {
+			pins = "gpio114";
+			drive-strength = <2>;
+			bias-disable; /* NO pull */
+		};
+	};
+
+	usb_irq_active: usb_irq_active {
+		mux {
+			pins = "gpio21";
+			function = "gpio";
 		};
 
-		hph_lr_swch_pin {
-			qcom,pins = <&gp 16>;
-			qcom,pin-func = <0>;
-			qcom,num-grp-pins = <1>;
-			label = "hph_lr_swch_pin";
-			hph_lr_switch_active: active {
-				drive-strength = <6>;
-				bias-pull-up;
-			};
-			hph_lr_switch_suspend: suspend {
-				drive-strength = <2>;
-				bias-pull-down;
-			};
+		config {
+			pins = "gpio21";
+			drive-strength = <2>;
+			bias-disable; /* NO pull */
 		};
+	};
+
+	hph_lr_switch_active: hph_lr_switch_active {
+		mux {
+			pins = "gpio16";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio16";
+			drive-strength = <6>;
+			bias-pull-up;
+		};
+	};
+
+	hph_lr_switch_suspend: hph_lr_switch_suspend {
+		mux {
+			pins = "gpio16";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio16";
+			drive-strength = <2>;
+			bias-pull-down;
+		};
+	};
 	};
 };
