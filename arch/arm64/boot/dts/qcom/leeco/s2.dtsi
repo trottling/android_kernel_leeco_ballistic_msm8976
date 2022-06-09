@@ -24,6 +24,10 @@
 
 /delete-node/ &cont_splash_mem;
 
+&other_ext_mem {
+    reg = <0x0 0x84A00000 0x0 0x1E00000>;
+};
+
 / {
 	reserved-memory {
 		ramoops: ramoops@9ff00000 {
@@ -34,11 +38,6 @@
 			console-size = <0x60000>;
 			ftrace-size = <0x10000>;
 			pmsg-size = <0x20000>;
-		};
-
-		other_ext_mem: other_ext_region@0 {
-			/delete-property/ reg;
-			reg = <0x0 0x84A00000 0x0 0x1E00000>;
 		};
 
 		cont_splash_mem: splash_region@82000000 {
@@ -239,9 +238,9 @@
 	status = "disabled";
 };
 
-&android_usb {
+/*&android_usb {
 	qcom,android-usb-cdrom;
-};
+};*/
 
 &usb_otg {
 	qcom,hsusb-otg-phy-init-seq =
@@ -311,6 +310,10 @@
 /delete-node/ &qcom_seecom;
 
 &soc {
+	pinctrl@1000000 {
+		disabled-pins = <0 1 2 3>;
+	};
+
 	qcom_seecom: qseecom@84A00000 {
 		compatible = "qcom,qseecom";
 		reg = <0x84A00000 0x1900000>;
@@ -339,13 +342,13 @@
 		qcom,ce-opp-freq = <100000000>;
 	};
 
-	blsp1_uart1: serial@78af000 {
-		compatible = "qcom,msm-lsuart-v14";
+	blsp1_uart1: uart@78af000 {
+		compatible = "qcom,msm-hsuart-v14";
 		reg = <0x78af000 0x200>;
 		interrupts = <0 107 0>;
 		status = "ok";
 		clocks = <&clock_gcc clk_gcc_blsp1_uart1_apps_clk>,
-		<&clock_gcc clk_gcc_blsp1_ahb_clk>;
+				<&clock_gcc clk_gcc_blsp1_ahb_clk>;
 		clock-names = "core_clk", "iface_clk";
 		pinctrl-names = "sleep", "default";
 		pinctrl-0 = <&hsuart_sleep>;
@@ -466,13 +469,13 @@
 		qcom,headset-detect-gpios = <&msm_gpio 114 0>;
 		asoc-platform = <&pcm0>, <&pcm1>, <&pcm2>, <&voip>, <&voice>,
 				<&loopback>, <&compress>, <&hostless>,
-				<&afe>, <&lsm>, <&routing>, <&lpa>,
+				<&afe>, <&lsm>, <&routing>, <&cpe>,
 				<&voice_svc>;
 		asoc-platform-names = "msm-pcm-dsp.0", "msm-pcm-dsp.1", "msm-pcm-dsp.2",
 				"msm-voip-dsp", "msm-pcm-voice", "msm-pcm-loopback",
 				"msm-compress-dsp", "msm-pcm-hostless", "msm-pcm-afe",
-				"msm-lsm-client", "msm-pcm-routing", "msm-pcm-lpa",
-				"msm-voice-svc";
+				"msm-lsm-client", "msm-pcm-routing", "msm-cpe-lsm",
+				"msm-pcm-dsp-noirq";
 		asoc-cpu = <&dai_pri_auxpcm>, <&dai_hdmi>,
 				<&dai_mi2s0>, <&dai_mi2s1>, <&dai_mi2s2>, <&dai_mi2s3>,
 				<&dai_mi2s5>, <&dai_mi2s6>,
@@ -520,12 +523,12 @@
 	};
 };
 
-&tlmm_pinmux {
+/*&tlmm_pinmux {
 	tlmm_gpio_key {
 		qcom,pins = <&gp 112>, <&gp 113>;
 		qcom,num-grp-pins = <2>;
 	};
-};
+};*/
 
 &spmi_bus {
 		qcom,pmi8950@3 {
@@ -569,7 +572,7 @@
 	bias-disable;
 };
 
-&pmi8950_haptic {
+&pmi_haptic {
 	qcom,vmax-mv = <3300>;
 };
 
@@ -606,21 +609,11 @@
 	qcom,mdss-dsi-pan-fps-update = "dfps_immediate_porch_mode_hfp";
 };
 
-&pmx_mdss {
-	qcom,num-grp-pins = <1>;
-	qcom,pins = <&gp 25>;
-};
-
-&pmx_mdss_te {
-	qcom,num-grp-pins = <1>;
-	qcom,pins = <&gp 24>;
-};
-
 &mdss_dsi0 {
+	qcom,dsi-pref-prim-pan = <&dsi_nt35596_1080_vid>;
 	pinctrl-names = "mdss_default", "mdss_sleep";
 	pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
 	pinctrl-1 = <&mdss_dsi_suspend &mdss_te_suspend>;
-	qcom,dsi-pref-prim-pan = <&dsi_nt35596_1080_vid>;
 	qcom,platform-reset-gpio = <&msm_gpio 25 0>;
 };
 
@@ -632,7 +625,7 @@
 	};
 };
 
-&pmi8950_charger {
+&qpnp_smbcharger {
 	qcom,float-voltage-mv = <4400>;
 	qcom,chg-led-sw-controls;
 	qcom,thermal-mitigation = <4500 3000 2000 1000 900 600 0>;
@@ -651,7 +644,7 @@
 	qcom,vchg_sns-vadc = <&pmi8950_vadc>;
 };
 
-&pmi8950_fg {
+&qpnp_fg {
 	qcom,battery-data = <&qrd_batterydata>;
 	qcom,cold-bat-decidegc = <(0)>;
 	qcom,cool-bat-decidegc = <(150)>;
