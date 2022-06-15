@@ -577,6 +577,10 @@
 	qcom,mdss-pref-prim-intf = "dsi";
 };
 
+&mdss_dsi {
+	hw-config = "single_dsi";
+};
+
 &mdss_fb0 {
 	 /delete-property/ qcom,mdss-fb-splash-logo-enabled;
 };
@@ -614,6 +618,25 @@
 	qcom,platform-reset-gpio = <&msm_gpio 25 0>;
 };
 
+&mdss_dsi1 {
+	status = "disabled";
+};
+
+&labibb {
+	qcom,lab@de00 {
+		qcom,qpnp-lab-init-voltage = <5600000>;
+		qcom,qpnp-lab-init-lcd-voltage = <5600000>;
+		interrupts = <0x3 0xde 0x0 IRQ_TYPE_LEVEL_LOW>;
+		interrupt-names = "lab_vreg_not_ok_interrupt";
+	};
+	qcom,ibb@dc00 {
+		qcom,qpnp-ibb-init-voltage = <5600000>;
+		qcom,qpnp-ibb-init-lcd-voltage = <5600000>;
+		interrupts = <0x3 0xdc 0x0 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-names = "ibb_vreg_not_ok_interrupt";
+	};
+};
+
 / {
 	qrd_batterydata: qcom,battery-data {
 		qcom,batt-id-range-pct = <15>;
@@ -626,7 +649,6 @@
 	qcom,float-voltage-mv = <4400>;
 	qcom,chg-led-sw-controls;
 	qcom,thermal-mitigation = <4500 3000 2000 1000 900 600 0>;
-	qcom,current-mitigation = <4500 3000 2000 500 500>;
 	qcom,temp-mitigation = <38 41 44>;
 	qcom,quiet_therm-vadc = <&pm8950_vadc>;
 	status = "okay";
@@ -678,4 +700,10 @@
 
 &slim_msm {
 	status = "disabled";
+};
+
+&thermal_zones {
+	xo-therm-adc {
+		polling-delay = <1000>;
+	};
 };
