@@ -1092,10 +1092,7 @@ CSID_TG:
 	}
 
 #ifdef CONFIG_MSMB_CAMERA_LEECO
-	if(slave_info->sensor_module_info){
-		pr_err("sensor_module_info %s\n", slave_info->sensor_module_info);
-		s_ctrl->sensordata->sensor_module_info = slave_info->sensor_module_info;
-	}
+	s_ctrl->sensordata->sensor_module_info = slave_info->sensor_module_info;
 	pr_err("sensor_gpio_id %d\n", slave_info->sensor_gpio_id);
 	s_ctrl->sensordata->sensor_gpio_id = slave_info->sensor_gpio_id;
 #endif
