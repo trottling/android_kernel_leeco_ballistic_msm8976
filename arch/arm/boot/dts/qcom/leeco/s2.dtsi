@@ -582,10 +582,6 @@
 		};
 };
 
-&ibb_regulator{
-	qcom,qpnp-ibb-discharge-resistor = <64>;
-};
-
 &dsi_panel_pwr_supply{
 	qcom,panel-supply-entry@3 {
 		qcom,supply-pre-off-sleep = <5>;
@@ -599,10 +595,6 @@
 
 &pmi8950_haptic {
 	qcom,vmax-mv = <3300>;
-};
-
-&mdss_mdp {
-	qcom,mdss-pref-prim-intf = "dsi";
 };
 
 &mdss_fb0 {
@@ -707,11 +699,6 @@
 		qcom,float-voltage-mv = <4400>;
 		qcom,recharge-mv = <100>;
 	};
-};
-
-&labibb {
-	status = "ok";
-	qpnp,qpnp-labibb-mode = "lcd";
 };
 
 &slim_msm {
