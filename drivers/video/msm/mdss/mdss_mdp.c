@@ -2282,7 +2282,7 @@ static int mdss_mdp_parse_dt_pipe(struct platform_device *pdev)
 	if (!mdata->vig_pipes) {
 		pr_err("no mem for vig_pipes: kzalloc fail\n");
 		rc = -ENOMEM;
-		goto parse_fail;
+		goto vig_alloc_fail;
 	}
 
 	mdata->rgb_pipes = devm_kzalloc(&mdata->pdev->dev,
@@ -2290,7 +2290,7 @@ static int mdss_mdp_parse_dt_pipe(struct platform_device *pdev)
 	if (!mdata->rgb_pipes) {
 		pr_err("no mem for rgb_pipes: kzalloc fail\n");
 		rc = -ENOMEM;
-		goto parse_fail;
+		goto rgb_alloc_fail;
 	}
 
 	if (mdata->ndma_pipes) {
@@ -2300,7 +2300,7 @@ static int mdss_mdp_parse_dt_pipe(struct platform_device *pdev)
 		if (!mdata->dma_pipes) {
 			pr_err("no mem for dma_pipes: kzalloc fail\n");
 			rc = -ENOMEM;
-			goto parse_fail;
+			goto dma_alloc_fail;
 		}
 	}
 
@@ -2477,7 +2477,7 @@ static int mdss_mdp_parse_dt_pipe(struct platform_device *pdev)
 		if (!mdata->cursor_pipes) {
 			pr_err("no mem for cursor_pipes: kzalloc fail\n");
 			rc = -ENOMEM;
-			goto parse_fail;
+			goto cursor_alloc_fail;
 		}
 		rc = mdss_mdp_parse_dt_handler(pdev,
 			"qcom,mdss-pipe-cursor-off", offsets,
@@ -2508,8 +2508,18 @@ static int mdss_mdp_parse_dt_pipe(struct platform_device *pdev)
 		pr_info("dedicated vp cursors detected, num=%d\n",
 			mdata->ncursor_pipes);
 	}
+	goto parse_done;
 
 parse_fail:
+kfree(mdata->cursor_pipes);
+cursor_alloc_fail:
+	kfree(mdata->dma_pipes);
+dma_alloc_fail:
+	kfree(mdata->rgb_pipes);
+rgb_alloc_fail:
+	kfree(mdata->vig_pipes);
+parse_done:
+vig_alloc_fail:
 	kfree(xin_id);
 xin_alloc_fail:
 	kfree(ftch_id);

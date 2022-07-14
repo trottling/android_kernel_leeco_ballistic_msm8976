@@ -1,3 +1,35 @@
+
+
+#####################################From the author#############################################
+#												#
+#	Some of the functions are included in the kernel, but are not used because it 		#
+#	causes a compilation error:								#
+#												#
+#		• iosched switcher								#
+#		• SIOPLUS, TRIPNDROID and VR IOSCHED						#
+#		• BRICKED HOTPLUG and ASMP HOTPLUG 						#
+#												#
+#												#
+#												#
+#	It works, but it's not necessary:							#
+#		• CPU_INPUT BOOST and CPU_WAKE BOOST 						#
+#												#
+#												#
+#												#
+#	Patches applied:									#
+#		• cdc_ncm.c_patch								#
+#		• pcsi.c_patch									#
+#		• mac80211.compat08082009.wl_frag+ack_v1.patch					#
+#												#
+#												#
+#	Compiled with: gcc-linaro-4.9.4-2017.01-x86_64_aarch64-linux-gnu			#
+#												#
+#	My custom arm64 config is called: lineage_s2_ballistic_defconfig			#
+#												#
+#################################################################################################
+
+
+
         Linux kernel release 3.x <http://kernel.org/>
 
 These are the release notes for Linux version 3.  Read them carefully,

@@ -707,4 +707,9 @@ config MSM_VSENS
 
 source "drivers/soc/qcom/memshare/Kconfig"
 
+
+config STATE_NOTIFIER
+        bool "State Notifier"
+        default n
+        
 endif # ARCH_MSM

@@ -735,3 +735,6 @@ source "arch/arm64/crypto/Kconfig"
 endif
 
 source "lib/Kconfig"
+
+source "arch/arm64/hotplug/Kconfig"
+source "arch/arm64/fastcharge/Kconfig"
